@@ -70,6 +70,7 @@ cp .agent /path/to/your-paper-repo/.agent
 | Venue / Year | Title | 领域 | 笔记 | Status |
 | --- | --- | --- | --- | --- |
 | NeurIPS 2017 | Attention Is All You Need | ml | `examples/【NeurIPS‘2017】attention-is-all-you-need.md` | DONE (example) |
+| arXiv 2026 | Lance: Unified Multimodal Modeling by Multi-Task Synergy | ml | `notes/ml/【arXiv‘2026】lance-unified-multimodal.md` | DONE |
 
 ## 后续
 
