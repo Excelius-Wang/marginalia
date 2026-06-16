@@ -1,0 +1,27 @@
+# Marginalia 论文精读 Agent 工作流
+
+在一个 git 支持的论文知识库里使用 `marginalia` skill 时：
+
+1. 按 skill 解析来源、判定领域、深度阅读，并产出或更新 `notes/<领域>/` 下的一篇笔记。
+2. 笔记需遵循当前模板，并包含招牌段落：`毒舌评论`、`作者思路重建`、`最脆弱的假设`、`最小复现实验`、`最强反例设计`、`Follow-up Research Idea`。
+3. 回填 README 索引：链接到笔记文件，`TODO`→`DONE` 只在笔记存在后再改。
+4. 跑 `git status --short`。
+5. 只 stage 本次任务改动的文件，通常：
+   - `README.md`
+   - `notes/<领域>/<笔记>.md`
+   - 本次有意创建的论文专属素材
+6. commit：
+
+```bash
+git commit -m "Add paper note: <短标题>"
+```
+
+   修订已有笔记用 `Update paper note: <短标题>`。
+
+7. 立即推送：
+
+```bash
+git push
+```
+
+8. 无改动不空 commit；push 失败要清楚报错并保留本地 commit。绝不 stage 用户的无关改动。
