@@ -19,7 +19,7 @@
 ## 3. 提交与推送
 
 1. 跑 `git status --short`。
-2. **只 stage 本次任务改动的文件**，通常是 `README.md` + `notes/<领域>/<笔记>.md` + 本次有意创建的论文专属素材。绝不 stage 用户的无关改动。
+2. **只 stage 本次任务改动的文件**，通常是 `README.md` + `notes/<领域>/<笔记>.md` + `.marginalia/feishu.json`（飞书映射）+ 本次有意创建的论文专属素材。绝不 stage 用户的无关改动。`.marginalia/figs/` 是派生图（已 gitignore），不提交。
 3. commit：新笔记用 `Add paper note: <短标题>`，修订用 `Update paper note: <短标题>`。
 4. 立即 `git push`。
 5. 无改动不要空 commit。push 失败要清楚报错，并保留本地 commit。

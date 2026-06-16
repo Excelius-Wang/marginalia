@@ -63,9 +63,20 @@ cp .agent /path/to/your-paper-repo/.agent
 
 完整示例见 `examples/` 目录。
 
+## 发布到飞书
+
+把每篇笔记发布成带图表/公式的飞书文档，挂进飞书知识库（Wiki，按领域建树），并在飞书多维表格（Base）登记可筛选的索引。本地 md 仍是版本化的源，飞书是渲染产物。详见 [skills/marginalia/references/feishu-publish.md](skills/marginalia/references/feishu-publish.md)。
+
+```bash
+# 需先 lark-cli auth login（用户身份）
+python3 skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md" --pdf /path/to/paper.pdf
+```
+
+幂等映射记于 `.marginalia/feishu.json`；派生图在 `.marginalia/figs/`（已 gitignore）。
+
 ## 论文索引
 
-> 新增笔记时在这里登记；`TODO`→`DONE` 在笔记文件存在后再改。
+> 飞书多维表格是可筛选的主索引；下表为离线备查。新增笔记时登记，`TODO`→`DONE` 在笔记文件存在后再改。
 
 | Venue / Year | Title | 领域 | 笔记 | Status |
 | --- | --- | --- | --- | --- |

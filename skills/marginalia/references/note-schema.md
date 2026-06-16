@@ -14,6 +14,7 @@
 - Venue / Year:
 - Note Name: 【VENUE‘YEAR】short-title
 - Paper:
+- Feishu Doc:
 - Code:
 - Dataset / Artifact:
 - Scope / Subfield:
@@ -141,3 +142,6 @@
 - **背景要短。** "前人工作与不足"只写 背景 → 问题 → gap，不要写成教科书式长背景。
 - **分清归属。** 用散文表述时，把"论文展示的"和"读者推出的"分开。
 - **Scope/Subfield 要窄。** 写论文真正的小研究方向，不是堆关键词；具体词表见对应的 `domains/<领域>.md`。
+- **关键图打页码。** `Key Artifacts` 里的关键图/表加 `[p.N]`（如 `Fig.6 [p.9]`），发布到飞书时据此从 PDF 抽图（见 `feishu-publish.md`）。
+- **公式用内联。** 关键公式用 `$...$` 包裹，发布到飞书会渲染成内联 latex。
+- **Feishu Doc 自动写回。** `- Feishu Doc:` 行由发布脚本自动填，无需手填。
