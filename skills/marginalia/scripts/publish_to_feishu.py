@@ -263,6 +263,31 @@ def lint_xml(xml):
     return problems
 
 
+def lint_latex(md):
+    """Structurally validate every $…$/$$…$$ fragment so a malformed formula
+    aborts instead of rendering broken in Feishu (latex is the only payload that
+    had no gate). Structural only — brace / \\left-\\right / \\begin-\\end balance
+    and emptiness — so it never false-positives on valid KaTeX the way a stricter
+    local engine (matplotlib mathtext) would."""
+    problems = []
+    frags = [m.group(1) for m in re.finditer(r"\$\$(.+?)\$\$", md, re.S)]
+    rest = re.sub(r"\$\$.+?\$\$", "", md, flags=re.S)
+    frags += [m.group(1) for m in re.finditer(r"\$([^$]+)\$", rest)]
+    for f in frags:
+        snip = re.sub(r"\s+", " ", f).strip()[:40]
+        if not f.strip():
+            problems.append("空公式 $…$（删掉或补内容）")
+            continue
+        body = f.replace("\\{", "").replace("\\}", "")  # ignore literal escaped braces
+        if body.count("{") != body.count("}"):
+            problems.append(f"公式花括号不配对（{{ {body.count('{')} / }} {body.count('}')}）：${snip}…$")
+        if len(re.findall(r"\\left\b", f)) != len(re.findall(r"\\right\b", f)):
+            problems.append(f"公式 \\left/\\right 不配对：${snip}…$")
+        if sorted(re.findall(r"\\begin\{([^}]*)\}", f)) != sorted(re.findall(r"\\end\{([^}]*)\}", f)):
+            problems.append(f"公式 \\begin/\\end 环境不配对：${snip}…$")
+    return problems
+
+
 def lint_anchors(body_xml, inline_figs):
     """Each inline figure's [@anchor] must match exactly one block's text, or the
     figure silently lands at the doc end instead of inline."""
@@ -353,6 +378,27 @@ def render_grid_pair(left, right):
             f'<column width-ratio="0.5">{rcol}</column></grid>')
 
 
+# Signature sections that carry the paper's verdict — the "read these first" path.
+SIGNATURE_PATH = ["一句话总结", "毒舌评论", "核心直觉", "最脆弱的假设"]
+
+
+def reading_guide(section_titles):
+    """Top 导读 callout: a fixed color legend (so readers can decode the semantic
+    colors) + a 'read these first' path over the signature sections. Feishu already
+    builds a clickable heading outline, so this orients rather than re-lists every
+    section."""
+    legend = ('<p><b>配色</b>：'
+              '<span text-color="blue">蓝 专名</span>　'
+              '<span text-color="purple">紫 机制</span>　'
+              '<span text-color="orange">橙 指标</span>　'
+              '<span text-color="green">绿 优势</span>　'
+              '<span text-color="red">红 批判</span></p>')
+    present = [t for t in SIGNATURE_PATH if any(s.startswith(t) for s in section_titles)]
+    path = (f'<p><b>速读路径</b>：{" → ".join(present)}（赶时间只看这几节即可抓住全文判断）</p>'
+            if present else "")
+    return callout("📖", "blue", legend + path)
+
+
 def match_callout(section_title):
     for key, style in CALLOUT_SECTIONS.items():
         if section_title.startswith(key):
@@ -368,7 +414,8 @@ def md_to_docx_xml(md):
     Metadata renders as a table; everything else is plain structural blocks.
     """
     title, sections = split_sections(md)
-    out = []
+    # Top 导读 callout: color legend + read-first path (hero banner lands just after it).
+    out = [reading_guide([t for t, _ in sections])]
     i = 0
     while i < len(sections):
         sect_title, body = sections[i]
@@ -611,6 +658,27 @@ def find_record_id(bt, tid, note_rel):
     return None
 
 
+NOTE_LINK = re.compile(r"(\]\()([^)]+\.md)(\))")
+
+
+def resolve_xref_links(md, note_path, cfg):
+    """Rewrite intra-library links to another note's `.md` into that note's Feishu
+    doc URL, so cross-links are clickable in Feishu (which silently drops non-http
+    hrefs like a relative path). The on-disk md keeps the portable relative path —
+    only the published render is rewritten. Unpublished targets stay as-is."""
+    notes = cfg.get("notes", {})
+    base = note_path.parent
+
+    def repl(m):
+        rel = str((base / m.group(2))).replace("\\", "/")
+        info = notes.get(rel)
+        if info and info.get("url"):
+            return m.group(1) + info["url"] + m.group(3)
+        return m.group(0)
+
+    return NOTE_LINK.sub(repl, md)
+
+
 def content_hash(md):
     """Stable hash of the note, ignoring the auto-written Feishu Doc line."""
     norm = re.sub(r"^- Feishu Doc:.*$\n?", "", md, flags=re.M)
@@ -737,7 +805,11 @@ def main():
     md = note_path.read_text(encoding="utf-8")
     note_rel = str(note_path)
     domain = note_path.parent.name if note_path.parent.name != "notes" else "general"
-    title, body_xml = md_to_docx_xml(md)
+    cfg = load_cfg()
+    # md stays the portable source; render from a copy with intra-library links
+    # rewritten to the targets' Feishu URLs (Feishu drops relative .md hrefs).
+    render_md = resolve_xref_links(md, note_path, cfg)
+    title, body_xml = md_to_docx_xml(render_md)
     meta = parse_metadata(md)
     figs = parse_figures(md) if args.pdf else []
     _, sections = split_sections(md)
@@ -766,7 +838,8 @@ def main():
     if end_figs:
         body_xml += SEP + h2("图表 (Figures)")
 
-    problems = lint_xml(body_xml) + lint_anchors(body_xml, inline_figs) + lint_md_tables(md)
+    problems = (lint_xml(body_xml) + lint_latex(md)
+                + lint_anchors(body_xml, inline_figs) + lint_md_tables(md))
     if problems:
         for p in problems:
             print(f"LINT: {p}", file=sys.stderr)
@@ -783,7 +856,6 @@ def main():
         sys.exit("渲染校验未通过，已中止发布（修好上面 LINT 指出的标记问题再发）。")
 
     auth_precheck()
-    cfg = load_cfg()
     prev = cfg["notes"].get(note_rel)
     h = content_hash(md)
     if prev and prev.get("hash") == h and not args.force:

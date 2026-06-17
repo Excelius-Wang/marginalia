@@ -45,6 +45,7 @@ python3 skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md
 
 **版面（借鉴 Notion paper-reading 模板的形式）**：
 
+- **顶部导读 callout**：脚本自动在文档最前插一个 `📖 导读` 块（无需在 md 里写），含两行：**配色图例**（蓝专名/紫机制/橙指标/绿优势/红批判，让读者能解码正文彩色）+ **速读路径**（一句话总结 → 毒舌评论 → 核心直觉 → 最脆弱的假设，赶时间只看这几节）。飞书已按 heading 自动生成大纲侧栏，故这里只做导向、不重复列全部小节。hero 头图紧随其后。
 - **顶部 banner**：给最能概览全文的那张图（通常是架构总览）在标记后加 `[hero]`，例如 `Fig.6 [p.9] [hero] 架构总览：…`。脚本会把它以 720px 居中插到正文最前（首节之前）。
 - **图穿插正文**：给图加 `[@锚文本]` 锚点（一段正文里**唯一**的短句），脚本用 `--selection-with-ellipsis` 把它插到那个块之后，例如 `Fig.1 [p.1] [@各任务反而互相增益] 雷达图：…`。没标 `[@...]` 的图统一落到文末「图表」节。
 - **描述性 caption**：图的 caption 自动取 `[p.N]`（及标记）之后的那段描述文字，并加「图N/表N」前缀，不再是干巴巴的 "Figure 1"。
@@ -72,13 +73,17 @@ python3 skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md
 
 通用块也补齐了：GFM 管道表格 `| … |`（表头灰底）→ `<table>`、有序列表 `1.` → `<ol seq="auto">`、`` `code` ``、链接、`<hr>`、两层嵌套列表。
 
+**知识库交叉链接**：笔记里指向库内另一篇笔记的相对 `.md` 链接（如 `[On-Policy SFT](【arXiv‘2026】towards-on-policy-sft.md)`），发布时脚本按 `feishu.json` 映射把 href **重写成目标笔记的飞书 URL**——因为飞书会静默丢弃非 http 的相对 href。本地 md 保持可移植的相对路径（GitHub/本地可跳转），只有飞书渲染产物用 URL。目标笔记尚未发布时链接原样保留；目标发布后对本篇 `--force` 重发即可让链接生效。
+
 **纪律（照搬 pretty-lark-doc）**：每个 callout 只在各自小节出现一次且彼此远离，故 2–3 语义色的克制原则仍成立；emoji 用默认 emoji 呈现的字符（避免带变体选择符的 `⚠️`）。发布后用 `lark-cli docs +fetch --doc <id> --doc-format xml --detail full` 核对：颜色会被飞书规范化为 `rgb(...)`，确认 callout/grid/table 块数与配色都在。
 
 > 改了渲染逻辑后重发已有笔记要加 `--force`：内容哈希忽略渲染、只看 md 正文，正文没改不会自动重发。
 
 ## 公式
 
-md 里用 `$...$` 包裹的会转成飞书内联 `<latex>`。飞书 v2 只支持**内联** latex；多行/展示公式 v1 作为纯文本/代码呈现（精确渲染成图是后续项）。
+md 里用 `$...$`（行内）或 `$$...$$`（展示）包裹的会转成飞书 `<latex>`。
+
+**发布前有公式结构校验门禁（fail-loud）**：`lint_latex` 对每个公式片段查花括号、`\left`/`\right`、`\begin`/`\end` 配对与空公式，挂了**中止发布**并报出问题片段。只做结构校验、不本地编译——避免严格本地引擎（如 mathtext）误杀飞书能渲染的合法 KaTeX，所以零误报。写错的 `\frac{a}{b`（少右括号）会被拦下，而合法的 `\right.`（隐形定界符）不会误报。
 
 ## 飞书组织
 
