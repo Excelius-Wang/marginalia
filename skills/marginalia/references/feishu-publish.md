@@ -36,6 +36,28 @@ python3 skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md
 
 脚本（`extract_figures.py`）按 caption 定位 + 行/列墨迹密度裁剪：`pdftotext -bbox` 找 “Figure N / Table N” caption 的坐标，`pdf2image` 渲染该页，向上跳过 caption→图之间的空白、再找图上方的空白带定出图顶，并按列分栏选出 caption 所在的那一栏（处理双栏/侧边图）。所有关键图聚到飞书文档末尾的「图表 Figures」节，按序、带 caption。
 
+## 语义渲染（页面美观）
+
+脚本不是把 md 平铺成灰色段落，而是按**固定小节标题**做语义路由，套用飞书的彩色块（参考开源 skill `pretty-lark-doc` 的渲染层）。保持 `note-schema.md` 的标准标题，美化才会触发：
+
+| 小节标题（前缀匹配） | 渲染 | 颜色 / emoji |
+| --- | --- | --- |
+| `Metadata` | 两列表格（字段名灰底加粗） | gray |
+| `TL;DR` | callout | 蓝 💡 |
+| `毒舌评论` | callout | 红 🔴 |
+| `核心 Intuition` | callout | 紫 ✨ |
+| `最脆弱的假设` | callout | 橙 ❗ |
+| `My Takeaways` | callout | 绿 ✅ |
+| `Follow-up Research Idea` | callout | 紫 🚀 |
+| `Strengths` + `Limitations`（相邻） | 左右并排 grid，各自 callout | 绿 ✅ / 橙 🚧 |
+| 其余小节 | 普通标题 + 块 | — |
+
+通用块也补齐了：GFM 管道表格 `| … |`（表头灰底）→ `<table>`、有序列表 `1.` → `<ol seq="auto">`、`**bold**`、`` `code` ``、链接、`<hr>`、两层嵌套列表。
+
+**纪律（照搬 pretty-lark-doc）**：每个 callout 只在各自小节出现一次且彼此远离，故 2–3 语义色的克制原则仍成立；emoji 用默认 emoji 呈现的字符（避免带变体选择符的 `⚠️`）。发布后用 `lark-cli docs +fetch --doc <id> --doc-format xml --detail full` 核对：颜色会被飞书规范化为 `rgb(...)`，确认 callout/grid/table 块数与配色都在。
+
+> 改了渲染逻辑后重发已有笔记要加 `--force`：内容哈希忽略渲染、只看 md 正文，正文没改不会自动重发。
+
 ## 公式
 
 md 里用 `$...$` 包裹的会转成飞书内联 `<latex>`。飞书 v2 只支持**内联** latex；多行/展示公式 v1 作为纯文本/代码呈现（精确渲染成图是后续项）。

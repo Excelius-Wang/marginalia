@@ -30,6 +30,21 @@ INLINE_CODE = re.compile(r"`([^`]+)`")
 INLINE_LATEX = re.compile(r"\$([^$]+)\$")
 BOLD = re.compile(r"\*\*([^*]+)\*\*")
 LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+ORDERED = re.compile(r"^(\s*)\d+\.\s+")
+TABLE_ROW = re.compile(r"^\s*\|.*\|\s*$")
+TABLE_SEP = re.compile(r"^\s*\|?[\s:|-]+\|[\s:|-]*$")
+
+# Semantic routing: marginalia's fixed section titles -> a colored callout.
+# (emoji, color); restrained — each fires once and sections are far apart so
+# the 2–3-color discipline still holds visually. Match by title prefix.
+CALLOUT_SECTIONS = {
+    "TL;DR": ("💡", "blue"),
+    "毒舌评论": ("🔴", "red"),
+    "核心 Intuition": ("✨", "purple"),
+    "最脆弱的假设": ("❗", "orange"),
+    "My Takeaways": ("✅", "green"),
+    "Follow-up Research Idea": ("🚀", "purple"),
+}
 
 
 def esc(t):
@@ -57,39 +72,59 @@ def inline(text):
     return re.sub(r"\x00(\d+)\x00", lambda m: slots[int(m.group(1))], out)
 
 
-def md_to_docx_xml(md):
-    """Convert a marginalia note body to DocxXML. Returns (title, xml_blocks)."""
-    lines = md.splitlines()
-    title = "Untitled"
+def parse_table(lines, i):
+    """Parse a GFM pipe table starting at lines[i]. Returns (xml, next_i)."""
+    def cells(row):
+        parts = [c.strip() for c in row.strip().strip("|").split("|")]
+        return parts
+    head = cells(lines[i])
+    body_rows = []
+    i += 2  # skip header + separator
+    while i < len(lines) and TABLE_ROW.match(lines[i]):
+        body_rows.append(cells(lines[i]))
+        i += 1
+    thead = "<tr>" + "".join(
+        f'<th background-color="light-gray"><b>{inline(c)}</b></th>' for c in head) + "</tr>"
+    tbody = "".join("<tr>" + "".join(f"<td>{inline(c)}</td>" for c in row) + "</tr>"
+                    for row in body_rows)
+    return f"<table><thead>{thead}</thead><tbody>{tbody}</tbody></table>", i
+
+
+def render_blocks(lines):
+    """Render a list of markdown lines (no `##` section headings) to DocxXML."""
     out = []
     i = 0
-    list_buf = []  # (indent, text)
+    list_buf = []      # (indent, text)
+    list_type = None   # 'ul' | 'ol'
 
     def flush_list():
-        nonlocal list_buf
+        nonlocal list_buf, list_type
         if not list_buf:
             return
-        # one level of nesting: indent >= 2 spaces -> child <ul> inside prev <li>
-        html = "<ul>"
+        tag = list_type
+        attr = ' seq="auto"' if tag == "ol" else ""
+        # one level of nesting: indent >= 2 spaces -> child list inside prev <li>
+        html = f"<{tag}{attr}>"
         prev_nested = False
         for indent, txt in list_buf:
             if indent >= 2:
                 if not prev_nested:
                     html = html[:-5] if html.endswith("</li>") else html  # reopen last li
-                    html += f"<ul><li>{inline(txt)}</li>"
+                    html += f"<{tag}{attr}><li>{inline(txt)}</li>"
                     prev_nested = True
                 else:
                     html += f"<li>{inline(txt)}</li>"
             else:
                 if prev_nested:
-                    html += "</ul></li>"
+                    html += f"</{tag}></li>"
                     prev_nested = False
                 html += f"<li>{inline(txt)}</li>"
         if prev_nested:
-            html += "</ul></li>"
-        html += "</ul>"
+            html += f"</{tag}></li>"
+        html += f"</{tag}>"
         out.append(html)
         list_buf = []
+        list_type = None
 
     while i < len(lines):
         ln = lines[i]
@@ -101,14 +136,15 @@ def md_to_docx_xml(md):
             while i < len(lines) and not lines[i].startswith("```"):
                 buf.append(lines[i])
                 i += 1
-            code = esc("\n".join(buf))
-            out.append(f'<pre lang="{esc(lang)}"><code>{code}</code></pre>')
+            out.append(f'<pre lang="{esc(lang)}"><code>{esc(chr(10).join(buf))}</code></pre>')
             i += 1
             continue
-        if ln.startswith("# "):
+        if TABLE_ROW.match(ln) and i + 1 < len(lines) and TABLE_SEP.match(lines[i + 1]):
             flush_list()
-            title = ln[2:].strip()
-        elif ln.startswith("###### "):
+            xml, i = parse_table(lines, i)
+            out.append(xml)
+            continue
+        if ln.startswith("###### "):
             flush_list(); out.append(f"<h6>{inline(ln[7:].strip())}</h6>")
         elif ln.startswith("##### "):
             flush_list(); out.append(f"<h5>{inline(ln[6:].strip())}</h5>")
@@ -116,12 +152,18 @@ def md_to_docx_xml(md):
             flush_list(); out.append(f"<h4>{inline(ln[5:].strip())}</h4>")
         elif ln.startswith("### "):
             flush_list(); out.append(f"<h3>{inline(ln[4:].strip())}</h3>")
-        elif ln.startswith("## "):
-            flush_list(); out.append(f"<h2>{inline(ln[3:].strip())}</h2>")
+        elif ORDERED.match(ln):
+            indent = len(ln) - len(ln.lstrip(" "))
+            if list_type == "ul":
+                flush_list()
+            list_type = "ol"
+            list_buf.append((indent, ORDERED.sub("", ln)))
         elif re.match(r"^\s*-\s+", ln):
             indent = len(ln) - len(ln.lstrip(" "))
-            txt = re.sub(r"^\s*-\s+", "", ln)
-            list_buf.append((indent, txt))
+            if list_type == "ol":
+                flush_list()
+            list_type = "ul"
+            list_buf.append((indent, re.sub(r"^\s*-\s+", "", ln)))
         elif ln.strip() == "---":
             flush_list(); out.append("<hr/>")
         elif ln.strip() == "":
@@ -130,6 +172,95 @@ def md_to_docx_xml(md):
             flush_list(); out.append(f"<p>{inline(ln.strip())}</p>")
         i += 1
     flush_list()
+    return "".join(out)
+
+
+def split_sections(md):
+    """Split a note into (doc_title, [(section_title, [body_lines]), ...])."""
+    title = "Untitled"
+    sections = []
+    cur_title, cur_body = None, []
+    for ln in md.splitlines():
+        if ln.startswith("# ") and not ln.startswith("## ") and title == "Untitled":
+            title = ln[2:].strip()
+        elif ln.startswith("## "):
+            if cur_title is not None:
+                sections.append((cur_title, cur_body))
+            cur_title, cur_body = ln[3:].strip(), []
+        elif cur_title is not None:
+            cur_body.append(ln)
+    if cur_title is not None:
+        sections.append((cur_title, cur_body))
+    return title, sections
+
+
+def callout(emoji, color, inner):
+    return (f'<callout emoji="{emoji}" background-color="light-{color}" '
+            f'border-color="{color}">{inner}</callout>')
+
+
+def render_metadata(body):
+    """Render the Metadata bullet block as a clean 2-column table."""
+    rows = []
+    for ln in body:
+        m = re.match(r"^- ([^:：]+)[:：]\s*(.*)$", ln.strip())
+        if m and m.group(2):
+            rows.append((m.group(1).strip(), m.group(2).strip()))
+    if not rows:
+        return render_blocks(body)
+    cells = "".join(
+        f'<tr><td background-color="light-gray"><b>{inline(k)}</b></td>'
+        f"<td>{inline(v)}</td></tr>" for k, v in rows)
+    return f"<table><tbody>{cells}</tbody></table>"
+
+
+def render_grid_pair(left, right):
+    """Render two sections side-by-side: Strengths (green) | Limitations (orange)."""
+    lt, lb = left
+    rt, rb = right
+    lcol = callout("✅", "green", f"<p><b>{inline(lt)}</b></p>" + render_blocks(lb))
+    rcol = callout("🚧", "orange", f"<p><b>{inline(rt)}</b></p>" + render_blocks(rb))
+    return (f"<h2>{inline(lt)} / {inline(rt)}</h2>"
+            f'<grid><column width-ratio="0.5">{lcol}</column>'
+            f'<column width-ratio="0.5">{rcol}</column></grid>')
+
+
+def match_callout(section_title):
+    for key, style in CALLOUT_SECTIONS.items():
+        if section_title.startswith(key):
+            return style
+    return None
+
+
+def md_to_docx_xml(md):
+    """Convert a marginalia note to DocxXML with semantic block routing.
+
+    Returns (doc_title, xml_blocks). Signature sections (TL;DR, 毒舌评论, …) are
+    wrapped in colored callouts; Strengths/Limitations become a side-by-side grid;
+    Metadata renders as a table; everything else is plain structural blocks.
+    """
+    title, sections = split_sections(md)
+    out = []
+    i = 0
+    while i < len(sections):
+        sect_title, body = sections[i]
+        # Pair Strengths + Limitations into a two-column grid.
+        if (sect_title.startswith("Strengths") and i + 1 < len(sections)
+                and sections[i + 1][0].startswith("Limitations")):
+            out.append(render_grid_pair(sections[i], sections[i + 1]))
+            i += 2
+            continue
+        if sect_title.startswith("Metadata"):
+            out.append(f"<h2>{inline(sect_title)}</h2>{render_metadata(body)}")
+            i += 1
+            continue
+        style = match_callout(sect_title)
+        if style:
+            emoji, color = style
+            out.append(f"<h2>{inline(sect_title)}</h2>{callout(emoji, color, render_blocks(body))}")
+        else:
+            out.append(f"<h2>{inline(sect_title)}</h2>{render_blocks(body)}")
+        i += 1
     return title, "\n".join(out)
 
 
