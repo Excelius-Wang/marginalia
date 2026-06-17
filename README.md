@@ -1,35 +1,63 @@
 # Marginalia
 
-> 把一篇论文变成一份可长期复用的中文深度笔记，而不是一段松散摘要。
+<p align="center">
+  <em>Turn a paper into a durable, reusable deep-reading note — not a loose summary.</em>
+</p>
 
-Marginalia（书页边的批注）是一个**论文精读 skill**：深度主动阅读 + 持久化知识库。它融合两个项目的长处——
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg" alt="License: MIT"></a>
+  <img src="https://img.shields.io/badge/Claude%20Code-supported-7c3aed" alt="Claude Code">
+  <img src="https://img.shields.io/badge/Codex-supported-10a37f" alt="Codex">
+  <img src="https://img.shields.io/badge/notes-Chinese-orange" alt="Notes in Chinese">
+</p>
 
-- 深度阅读的"大脑"参考 [FeijiangHan/PaperForge](https://github.com/FeijiangHan/PaperForge)：重建作者思路、最脆弱的假设、最强反例、非增量 follow-up idea、信息来源纪律、写作风格。
-- 持久化的"身体"参考 [LazyDreamingDog/paper-reading-workflow](https://github.com/LazyDreamingDog/paper-reading-workflow)：统一笔记模板、`毒舌评论`、git 知识库、README 索引。
+<p align="center">
+  <b>English</b> · <a href="README.zh-CN.md">简体中文</a>
+</p>
 
-同时支持 **Claude Code** 和 **Codex**，通用领域 + 可插拔领域 profile。
+---
 
-## 它做什么
+**Marginalia** (the notes scribbled in a book's margins) is a **deep paper-reading skill**: active critical reading plus a persistent knowledge base. It fuses the strengths of two projects —
 
-- 把论文标题 / DOI / arXiv / OpenReview / 出版社 / GitHub / 本地 PDF 变成一份结构化中文笔记。
-- 强调动机、basic idea、方法推理、证据、最脆弱假设、反例与个人 takeaway。
-- TL;DR 之后给一段够狠的 `毒舌评论`。
-- 笔记落到 `notes/`，回填 README 索引，并 commit/push。
+- The **"brain"** of deep reading, after [FeijiangHan/PaperForge](https://github.com/FeijiangHan/PaperForge): reconstruct the author's reasoning, surface the most fragile assumption, design the strongest counterexample, propose non-incremental follow-up ideas, keep source discipline, and write with style.
+- The **"body"** of persistence, after [LazyDreamingDog/paper-reading-workflow](https://github.com/LazyDreamingDog/paper-reading-workflow): a unified note template, a `Sharp Verdict`, a git knowledge base, and a README index.
 
-## 仓库结构
+It runs on both **Claude Code** and **Codex**, with a general domain plus pluggable per-domain profiles.
+
+## What it does
+
+- Turns a paper **title / DOI / arXiv / OpenReview / publisher / GitHub / local PDF** into one structured note.
+- Emphasizes motivation, the basic idea, the reasoning behind the method, the evidence, the most fragile assumption, counterexamples, and your own takeaways.
+- Follows the TL;DR with a genuinely sharp `Sharp Verdict` — not a neutral recap.
+- Saves the note under `notes/`, backfills the README index, and commits/pushes.
+- Optionally **publishes each note to Feishu (Lark)** as a rich document with figures, formulas, and tables — filed into a Wiki tree by domain and indexed in a filterable Base table.
+
+## How it reads
+
+Not a paraphrase of the abstract. The skill runs a disciplined internal method (see [`reading-method.md`](skills/marginalia/references/reading-method.md)):
+
+1. **Resolve the source** and read it through.
+2. **Three passes** — problem & claims → method & mechanism → evidence.
+3. **Calibrate novelty** against 2–3 nearest prior works.
+4. **Reconstruct the author's idea** using only what was known *before* this paper.
+5. **Critical synthesis** — treat the paper as something to be challenged.
+6. **Number re-check** — verify every cited figure/table number against the source before a sharp claim leans on it.
+
+## Repository layout
 
 ```text
 marginalia/
-├── skills/marginalia/        # 可安装的 skill 本体
+├── skills/marginalia/        # the installable skill itself
 │   ├── SKILL.md
-│   ├── agents/openai.yaml    # Codex 展示元数据
-│   └── references/           # 按需加载：流程 / 模板 / 风格 / 来源解析 / git / 领域
-├── .agent                    # Codex 工作流文件
-├── notes/                    # 你的论文笔记（知识库）
-└── examples/                 # 示例笔记
+│   ├── agents/openai.yaml    # Codex display metadata
+│   ├── references/           # progressive disclosure: method / schema / style / source / git / domains
+│   └── scripts/              # publish_to_feishu.py, extract_figures.py
+├── .agent                    # Codex workflow file
+├── notes/                    # your paper notes (the knowledge base)
+└── examples/                 # example notes
 ```
 
-## 安装
+## Install
 
 ### Claude Code
 
@@ -38,62 +66,69 @@ mkdir -p ~/.claude/skills
 cp -R skills/marginalia ~/.claude/skills/marginalia
 ```
 
-之后在对话里直接发论文链接或标题，skill 会自动触发。
+Then just drop a paper link or title into the conversation — the skill triggers automatically.
 
 ### Codex
 
 ```bash
 mkdir -p ~/.codex/skills
 cp -R skills/marginalia ~/.codex/skills/
-# 在论文知识库根目录放一份工作流文件
+# place a workflow file at the root of your paper knowledge base
 cp .agent /path/to/your-paper-repo/.agent
 ```
 
-## 用法
+## Usage
 
 ```text
-精读这篇论文：https://arxiv.org/abs/1706.03762
-读一下 /path/to/paper.pdf，整理到 notes/ml/
-精读 Attention Is All You Need，并按索引规范回填
+Deep-read this paper: https://arxiv.org/abs/1706.03762
+Read /path/to/paper.pdf and file it under notes/ml/
+Deep-read "Attention Is All You Need" and backfill the index
 ```
 
-## 笔记风格
+## Note style
 
-模板见 [skills/marginalia/references/note-schema.md](skills/marginalia/references/note-schema.md)。主要段落：Metadata、TL;DR、毒舌评论、研究问题、前人工作、作者思路重建、核心 Intuition、Method、Evaluation、Key Artifacts、最脆弱的假设、最小复现实验、最强反例、Strengths / Limitations、My Takeaways、Follow-up Idea、Related Papers、Open Questions。
+See the template in [`note-schema.md`](skills/marginalia/references/note-schema.md). Core sections: Metadata, TL;DR, Sharp Verdict, Research Question, Prior Work, Claimed Contributions, Reconstructing the Idea, Core Intuition, Method & Pipeline, Math Derivation *(optional)*, Threat Model *(optional)*, Evaluation, Repro Config *(optional)*, Key Artifacts, Most Fragile Assumption, Minimal Reproduction, Strongest Counterexample, Strengths / Limitations, My Takeaways, Follow-up Idea, Related Papers, Open Questions.
 
-完整示例见 `examples/` 目录。
+The template is a ceiling, not a checklist — trim sections that don't fit the paper type instead of padding with `N/A`. Full examples live in [`examples/`](examples/).
 
-## 发布到飞书
+## Publish to Feishu (Lark)
 
-把每篇笔记发布成带图表/公式的飞书文档，挂进飞书知识库（Wiki，按领域建树），并在飞书多维表格（Base）登记可筛选的索引。本地 md 仍是版本化的源，飞书是渲染产物。详见 [skills/marginalia/references/feishu-publish.md](skills/marginalia/references/feishu-publish.md)。
+Publish each note as a Feishu document with native figures, formulas, and tables, filed into a Wiki tree (by domain) and registered in a filterable Base table. The local markdown stays the **version-controlled source**; Feishu is the **rendered artifact**. Details in [`feishu-publish.md`](skills/marginalia/references/feishu-publish.md).
 
 ```bash
-# 需先 lark-cli auth login（用户身份）
+# requires `lark-cli auth login` (user identity) first
 python3 skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md" --pdf /path/to/paper.pdf
 ```
 
-幂等映射记于 `.marginalia/feishu.json`；派生图在 `.marginalia/figs/`（已 gitignore）。
+Highlights:
 
-## 论文索引
+- **Semantic rendering** — signature sections become colored callouts; Strengths/Limitations a side-by-side grid; a top "reading guide" callout carries a color legend and a fast-path through the signature sections.
+- **Figures** — extracted geometrically from the PDF via PyMuPDF; `[hero]` banners the overview figure, `[@anchor]` inlines a figure next to its discussion, `[box=...]` overrides a bad crop manually.
+- **Fail-loud lint gates** — malformed color tags, unbalanced XML, broken LaTeX (brace / `\left`-`\right` / `\begin`-`\end` balance), and bad anchors **abort the publish** instead of shipping broken.
+- **Idempotent & stable URLs** — re-publishing updates the same doc in place; cross-links to other notes in the base resolve to their Feishu URLs while the markdown keeps portable relative paths.
 
-> 飞书多维表格是可筛选的主索引；下表为离线备查。新增笔记时登记，`TODO`→`DONE` 在笔记文件存在后再改。
+Idempotency mapping lives in `.marginalia/feishu.json`; derived figures in `.marginalia/figs/` (gitignored).
 
-| Venue / Year | Title | 领域 | 笔记 | Status |
+## Paper index
+
+> The Feishu Base table is the filterable primary index; the table below is an offline mirror. Register a note on creation; flip `TODO`→`DONE` once the file exists.
+
+| Venue / Year | Title | Domain | Note | Status |
 | --- | --- | --- | --- | --- |
 | NeurIPS 2017 | Attention Is All You Need | ml | `notes/ml/【NeurIPS‘2017】attention-is-all-you-need.md` | DONE |
 | arXiv 2026 | Lance: Unified Multimodal Modeling by Multi-Task Synergy | ml | `notes/ml/【arXiv‘2026】lance-unified-multimodal.md` | DONE |
 | arXiv 2026 | Towards On-Policy SFT: Distribution Discriminant Theory | ml | `notes/ml/【arXiv‘2026】towards-on-policy-sft.md` | DONE |
 | NeurIPS 2025 | Think-RM: Enabling Long-Horizon Reasoning in Generative Reward Models | ml | `notes/ml/【NeurIPS‘2025】think-rm-long-horizon-reasoning-genrm.md` | DONE |
-| NeurIPS 2017 | Attention Is All You Need (示例模板) | ml | `examples/【NeurIPS‘2017】attention-is-all-you-need.md` | DONE (example) |
+| NeurIPS 2017 | Attention Is All You Need (example template) | ml | `examples/【NeurIPS‘2017】attention-is-all-you-need.md` | DONE (example) |
 
-## 后续
+## Roadmap
 
-发现功能（从 arXiv + HuggingFace 抓热门 / 新论文、出每日 digest）将作为独立项目 `paper-radar`，届时复用本仓库的 `source-resolution` / `git-workflow` / `domains`。
+Discovery (pulling trending / new papers from arXiv + Hugging Face and emitting a daily digest) will ship as a separate project, `paper-radar`, reusing this repo's `source-resolution` / `git-workflow` / `domains`.
 
-## 致谢
+## Acknowledgements
 
-感谢 [PaperForge](https://github.com/FeijiangHan/PaperForge) 与 [paper-reading-workflow](https://github.com/LazyDreamingDog/paper-reading-workflow) 两个项目的启发。
+Thanks to [PaperForge](https://github.com/FeijiangHan/PaperForge) and [paper-reading-workflow](https://github.com/LazyDreamingDog/paper-reading-workflow) for the inspiration.
 
 ## License
 
-MIT
+[MIT](LICENSE)
