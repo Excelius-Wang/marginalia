@@ -80,8 +80,9 @@ python3 skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md
 
 | Venue / Year | Title | 领域 | 笔记 | Status |
 | --- | --- | --- | --- | --- |
-| NeurIPS 2017 | Attention Is All You Need | ml | `examples/【NeurIPS‘2017】attention-is-all-you-need.md` | DONE (example) |
+| NeurIPS 2017 | Attention Is All You Need | ml | `notes/ml/【NeurIPS‘2017】attention-is-all-you-need.md` | DONE |
 | arXiv 2026 | Lance: Unified Multimodal Modeling by Multi-Task Synergy | ml | `notes/ml/【arXiv‘2026】lance-unified-multimodal.md` | DONE |
+| NeurIPS 2017 | Attention Is All You Need (示例模板) | ml | `examples/【NeurIPS‘2017】attention-is-all-you-need.md` | DONE (example) |
 
 ## 后续
 

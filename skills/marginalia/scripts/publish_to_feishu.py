@@ -596,7 +596,8 @@ def find_record_id(bt, tid, note_rel):
     except Exception:  # noqa: BLE001
         return None
     recs, ids = D.get("data") or [], D.get("record_id_list") or []
-    names = [f.get("name") or f.get("field_name") for f in (D.get("fields") or [])]
+    names = [f if isinstance(f, str) else (f.get("name") or f.get("field_name"))
+             for f in (D.get("fields") or [])]
     if "Note" not in names:
         return None
     ci = names.index("Note")
