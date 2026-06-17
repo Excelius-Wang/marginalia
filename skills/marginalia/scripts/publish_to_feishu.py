@@ -232,7 +232,9 @@ def render_metadata(body):
     cells = "".join(
         f'<tr><td background-color="light-gray"><b>{inline(k)}</b></td>'
         f"<td>{inline(v)}</td></tr>" for k, v in rows)
-    return f"<table><tbody>{cells}</tbody></table>"
+    # colgroup widths make the table span the page (narrow field col + wide value col).
+    return ('<table><colgroup><col width="170"/><col width="640"/></colgroup>'
+            f"<tbody>{cells}</tbody></table>")
 
 
 def render_grid_pair(left, right):
