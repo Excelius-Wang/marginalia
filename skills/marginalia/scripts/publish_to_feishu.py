@@ -107,7 +107,9 @@ def parse_table(lines, i):
     """Parse a GFM pipe table -> DocxXML with content-proportional column widths
     and centered numeric columns. Returns (xml, next_i)."""
     def cells(row):
-        return [c.strip() for c in row.strip().strip("|").split("|")]
+        # split on unescaped | ; restore \| as a literal | inside cells
+        return [c.strip().replace("\\|", "|")
+                for c in re.split(r"(?<!\\)\|", row.strip().strip("|"))]
     head = cells(lines[i])
     ncol = len(head)
     body_rows = []
@@ -254,6 +256,42 @@ def lint_xml(xml):
         c = len(re.findall(rf"</{tag}>", xml))
         if o != c:
             problems.append(f"标签不平衡 <{tag}>：{o} 开 / {c} 闭")
+    big = [b for b in top_level_blocks(xml) if len(b) > HARD_BLOCK]
+    if big:
+        problems.append(f"单个块过长（{len(big[0])}>{HARD_BLOCK}），无法安全分块发布——"
+                        f"把该小节拆出子标题/拆段：…{big[0][:50]}…")
+    return problems
+
+
+def lint_anchors(body_xml, inline_figs):
+    """Each inline figure's [@anchor] must match exactly one block's text, or the
+    figure silently lands at the doc end instead of inline."""
+    problems = []
+    text = re.sub(r"<[^>]+>", "", body_xml)   # strip tags -> rendered text
+    for m in inline_figs:
+        n = text.count(m["anchor"])
+        if n == 0:
+            problems.append(f"图 {m['label']} 的锚点未在正文出现：'{m['anchor']}'（图会落到文末）")
+        elif n > 1:
+            problems.append(f"图 {m['label']} 的锚点不唯一（出现 {n} 次）：'{m['anchor']}'（可能插错位置）")
+    return problems
+
+
+def lint_md_tables(md):
+    """Flag GFM table rows whose column count differs from the header — usually a
+    stray unescaped `|` inside a cell (use `\\|`)."""
+    problems = []
+    lines = md.splitlines()
+    for i, ln in enumerate(lines):
+        if TABLE_ROW.match(ln) and i + 1 < len(lines) and TABLE_SEP.match(lines[i + 1]):
+            ncol = len(re.split(r"(?<!\\)\|", ln.strip().strip("|")))
+            j = i + 2
+            while j < len(lines) and TABLE_ROW.match(lines[j]):
+                rc = len(re.split(r"(?<!\\)\|", lines[j].strip().strip("|")))
+                if rc != ncol:
+                    problems.append(f"表格列数不一致（表头 {ncol}，第 {j+1} 行 {rc}）：可能有未转义的 | ，"
+                                    f"用 \\| ：{lines[j].strip()[:40]}")
+                j += 1
     return problems
 
 
@@ -586,21 +624,44 @@ def writeback_url(note_path, md, doc_url):
 
 SEP = "\n<hr/>\n"
 MAX_CHUNK = 3000   # `docs +create`/`append` truncate on oversized --content; chunk under this
+HARD_BLOCK = 8000  # a single atomic block above this can't be chunked safely -> lint fails
+
+_TAG = re.compile(r"<(/?)([a-zA-Z0-9]+)\b[^>]*?(/?)>")
 
 
-def chunk_sections(body_xml):
-    """Group `<hr/>`-separated sections into chunks under MAX_CHUNK chars."""
-    sections = body_xml.split(SEP)
-    chunks, cur, cur_len = [], [], 0
-    for s in sections:
-        if cur and cur_len + len(s) > MAX_CHUNK:
-            chunks.append(SEP.join(cur))
-            cur, cur_len = [], 0
-        cur.append(s)
-        cur_len += len(s) + len(SEP)
+def top_level_blocks(xml):
+    """Split xml into top-level block strings via a tag-depth scan (so a chunk
+    boundary never lands inside a callout/grid/table/list). Contiguous spans —
+    joining them reconstructs xml exactly."""
+    blocks, depth, start = [], 0, 0
+    for m in _TAG.finditer(xml):
+        closing, _, selfclose = m.group(1), m.group(2), m.group(3)
+        if selfclose:
+            if depth == 0:
+                blocks.append(xml[start:m.end()]); start = m.end()
+        elif not closing:
+            depth += 1
+        else:
+            depth = max(0, depth - 1)
+            if depth == 0:
+                blocks.append(xml[start:m.end()]); start = m.end()
+    if start < len(xml):
+        blocks.append(xml[start:])
+    return [b for b in blocks if b.strip()]
+
+
+def chunk_body(body_xml):
+    """Group top-level blocks into chunks under MAX_CHUNK. No separator is added
+    on join (the `<hr/>` dividers are already blocks), so an oversized section
+    splitting across chunks won't sprout a spurious divider mid-section."""
+    chunks, cur = [], ""
+    for b in top_level_blocks(body_xml):
+        if cur and len(cur) + len(b) > MAX_CHUNK:
+            chunks.append(cur); cur = ""
+        cur += b
     if cur:
-        chunks.append(SEP.join(cur))
-    return chunks
+        chunks.append(cur)
+    return chunks or [""]
 
 
 def _insert_media(did, m, *, width=None, anchor=None, before=False):
@@ -620,7 +681,7 @@ def build_doc_body(title, body_xml, hero, inline_figs, end_figs, hero_anchor, do
     (stable URL); otherwise create a new doc. Oversized --content is silently
     truncated, so write the title + first chunk, then `append` the rest.
     """
-    chunks = chunk_sections(body_xml) or [""]
+    chunks = chunk_body(body_xml)
     head = f"<title>{esc(title)}</title>\n{chunks[0]}"
     if doc_id:
         lark("docs", "+update", "--api-version", "v2", "--doc", doc_id,
@@ -629,9 +690,9 @@ def build_doc_body(title, body_xml, hero, inline_figs, end_figs, hero_anchor, do
     else:
         doc = lark("docs", "+create", "--content", "-", "--as", "user", inp=head)["document"]
         did, url = doc["document_id"], doc["url"]
-    for ch in chunks[1:]:
+    for ch in chunks[1:]:  # boundaries are between blocks; no separator to add
         lark("docs", "+update", "--api-version", "v2", "--doc", did,
-             "--command", "append", "--content", SEP + ch, "--as", "user")
+             "--command", "append", "--content", ch, "--as", "user")
     if len(chunks) > 1:
         print(f"  body {'overwritten' if doc_id else 'created'} in {len(chunks)} chunks")
     # Hero banner above the first section; inline figures after their anchor text;
@@ -694,7 +755,7 @@ def main():
     if end_figs:
         body_xml += SEP + h2("图表 (Figures)")
 
-    problems = lint_xml(body_xml)
+    problems = lint_xml(body_xml) + lint_anchors(body_xml, inline_figs) + lint_md_tables(md)
     if problems:
         for p in problems:
             print(f"LINT: {p}", file=sys.stderr)
