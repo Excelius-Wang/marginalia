@@ -45,12 +45,12 @@ TABLE_SEP = re.compile(r"^\s*\|?[\s:|-]+\|[\s:|-]*$")
 # (emoji, color); restrained — each fires once and sections are far apart so
 # the 2–3-color discipline still holds visually. Match by title prefix.
 CALLOUT_SECTIONS = {
-    "TL;DR": ("💡", "blue"),
+    "一句话总结": ("💡", "blue"),
     "毒舌评论": ("🔴", "red"),
-    "核心 Intuition": ("✨", "purple"),
+    "核心直觉": ("✨", "purple"),
     "最脆弱的假设": ("❗", "orange"),
-    "My Takeaways": ("✅", "green"),
-    "Follow-up Research Idea": ("🚀", "purple"),
+    "我的判断": ("✅", "green"),
+    "后续研究设想": ("🚀", "purple"),
 }
 
 
@@ -267,12 +267,12 @@ def md_to_docx_xml(md):
     while i < len(sections):
         sect_title, body = sections[i]
         # Pair Strengths + Limitations into a two-column grid.
-        if (sect_title.startswith("Strengths") and i + 1 < len(sections)
-                and sections[i + 1][0].startswith("Limitations")):
+        if (sect_title.startswith("优势") and i + 1 < len(sections)
+                and sections[i + 1][0].startswith("局限")):
             out.append(render_grid_pair(sections[i], sections[i + 1]))
             i += 2
             continue
-        if sect_title.startswith("Metadata"):
+        if sect_title.startswith("元数据"):
             out.append(f"{h2(sect_title)}{render_metadata(body)}")
             i += 1
             continue
@@ -292,7 +292,7 @@ def md_to_docx_xml(md):
 def parse_metadata(md):
     """Pull the `## Metadata` bullet block into a dict {field: value}."""
     meta = {}
-    m = re.search(r"^## Metadata\s*$(.*?)^## ", md, re.S | re.M)
+    m = re.search(r"^## 元数据.*?$(.*?)^## ", md, re.S | re.M)
     block = m.group(1) if m else ""
     for line in block.splitlines():
         mm = re.match(r"^- ([^:：]+)[:：]\s*(.*)$", line.strip())
@@ -584,7 +584,7 @@ def main():
     hero = next((m for m in manifest if m["label"] == hero_label), None)
     rest = [m for m in manifest if m is not hero]
     if rest:
-        body_xml += "\n<hr/>\n" + h2("图表 Figures")
+        body_xml += "\n<hr/>\n" + h2("图表 (Figures)")
 
     if args.dry_run:
         print(f"<title>{esc(title)}</title>\n{body_xml}")
