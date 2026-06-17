@@ -58,7 +58,11 @@ python3 skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md
 | `Strengths` + `Limitations`（相邻） | 左右并排 grid，各自 callout | 绿 ✅ / 橙 🚧 |
 | 其余小节 | 普通标题 + 块 | — |
 
-通用块也补齐了：GFM 管道表格 `| … |`（表头灰底）→ `<table>`、有序列表 `1.` → `<ol seq="auto">`、`**bold**`、`` `code` ``、链接、`<hr>`、两层嵌套列表。
+**章节标题彩色**：每个 `## ` 标题渲染成彩色（callout 小节用其语义色，其余蓝色），呼应参考排版的彩色标题。
+
+**正文内联语义色**：笔记里 `{{c:词}}` 标记渲染成彩色文本，`c` ∈ `b`蓝/`p`紫/`o`橙/`g`绿/`r`红，不同颜色不同含义（专名/机制/指标/优势/风险），由写笔记的人按 `style-guide.md` 的纪律主动判断打标——这是写作的一部分，不是机械正则。`**加粗**` 只给核心论断主干。颜色可与加粗叠加（`{{r:**…**}}`）。
+
+通用块也补齐了：GFM 管道表格 `| … |`（表头灰底）→ `<table>`、有序列表 `1.` → `<ol seq="auto">`、`` `code` ``、链接、`<hr>`、两层嵌套列表。
 
 **纪律（照搬 pretty-lark-doc）**：每个 callout 只在各自小节出现一次且彼此远离，故 2–3 语义色的克制原则仍成立；emoji 用默认 emoji 呈现的字符（避免带变体选择符的 `⚠️`）。发布后用 `lark-cli docs +fetch --doc <id> --doc-format xml --detail full` 核对：颜色会被飞书规范化为 `rgb(...)`，确认 callout/grid/table 块数与配色都在。
 

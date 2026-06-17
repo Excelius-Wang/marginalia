@@ -30,6 +30,12 @@ INLINE_CODE = re.compile(r"`([^`]+)`")
 INLINE_LATEX = re.compile(r"\$([^$]+)\$")
 BOLD = re.compile(r"\*\*([^*]+)\*\*")
 LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
+# Semantic inline color the agent authors in the note: {{c:term}} -> colored span.
+# Different colors carry different meaning (see references/style-guide.md):
+#   b 蓝=专名(模型/方法/系统/数据集/benchmark)  p 紫=机制/技术概念
+#   o 橙=关键指标/数字结论  g 绿=正面判断/优势  r 红=风险/短板/批判
+COLOR = re.compile(r"\{\{([bpogr]):(.+?)\}\}", re.S)
+CMAP = {"b": "blue", "p": "purple", "o": "orange", "g": "green", "r": "red"}
 ORDERED = re.compile(r"^(\s*)\d+\.\s+")
 TABLE_ROW = re.compile(r"^\s*\|.*\|\s*$")
 TABLE_SEP = re.compile(r"^\s*\|?[\s:|-]+\|[\s:|-]*$")
@@ -63,13 +69,20 @@ def inline(text):
         slots.append(html)
         return f"\x00{len(slots) - 1}\x00"
 
+    # Semantic color first, recursing so a colored term can also be bold/code.
+    text = COLOR.sub(
+        lambda m: stash(f'<span text-color="{CMAP[m.group(1)]}">{inline(m.group(2))}</span>'),
+        text)
     text = LINK.sub(lambda m: stash(f'<a href="{esc(m.group(2))}">{esc(m.group(1))}</a>'), text)
     text = INLINE_CODE.sub(lambda m: stash(f"<code>{esc(m.group(1))}</code>"), text)
     text = INLINE_LATEX.sub(lambda m: stash(f"<latex>{esc(m.group(1))}</latex>"), text)
     text = BOLD.sub(lambda m: stash(f"<b>{esc(m.group(1))}</b>"), text)
     # escape whatever literal text remains (placeholders use \x00 sentinels)
     out = "".join(p if p.startswith("\x00") else esc(p) for p in re.split(r"(\x00\d+\x00)", text))
-    return re.sub(r"\x00(\d+)\x00", lambda m: slots[int(m.group(1))], out)
+    # restore placeholders, looping so nested ones (e.g. color inside bold) fully resolve
+    while "\x00" in out:
+        out = re.sub(r"\x00(\d+)\x00", lambda m: slots[int(m.group(1))], out)
+    return out
 
 
 def parse_table(lines, i):
@@ -199,6 +212,11 @@ def callout(emoji, color, inner):
             f'border-color="{color}">{inner}</callout>')
 
 
+def h2(title, color="blue"):
+    """Colored section heading (matches the reference's blue/colored headers)."""
+    return f'<h2><span text-color="{color}">{inline(title)}</span></h2>'
+
+
 def render_metadata(body):
     """Render the Metadata bullet block as a clean 2-column table."""
     rows = []
@@ -220,7 +238,8 @@ def render_grid_pair(left, right):
     rt, rb = right
     lcol = callout("✅", "green", f"<p><b>{inline(lt)}</b></p>" + render_blocks(lb))
     rcol = callout("🚧", "orange", f"<p><b>{inline(rt)}</b></p>" + render_blocks(rb))
-    return (f"<h2>{inline(lt)} / {inline(rt)}</h2>"
+    return (f'<h2><span text-color="green">{inline(lt)}</span>'
+            f' / <span text-color="orange">{inline(rt)}</span></h2>'
             f'<grid><column width-ratio="0.5">{lcol}</column>'
             f'<column width-ratio="0.5">{rcol}</column></grid>')
 
@@ -251,15 +270,15 @@ def md_to_docx_xml(md):
             i += 2
             continue
         if sect_title.startswith("Metadata"):
-            out.append(f"<h2>{inline(sect_title)}</h2>{render_metadata(body)}")
+            out.append(f"{h2(sect_title)}{render_metadata(body)}")
             i += 1
             continue
         style = match_callout(sect_title)
         if style:
             emoji, color = style
-            out.append(f"<h2>{inline(sect_title)}</h2>{callout(emoji, color, render_blocks(body))}")
+            out.append(f"{h2(sect_title, color)}{callout(emoji, color, render_blocks(body))}")
         else:
-            out.append(f"<h2>{inline(sect_title)}</h2>{render_blocks(body)}")
+            out.append(f"{h2(sect_title)}{render_blocks(body)}")
         i += 1
     # Divider between sections for visual rhythm (Metadata header sits above the first).
     return title, "\n<hr/>\n".join(out)
@@ -478,11 +497,38 @@ def writeback_url(note_path, md, doc_url):
     return md
 
 
+SEP = "\n<hr/>\n"
+MAX_CHUNK = 3000   # `docs +create`/`append` truncate on oversized --content; chunk under this
+
+
+def chunk_sections(body_xml):
+    """Group `<hr/>`-separated sections into chunks under MAX_CHUNK chars."""
+    sections = body_xml.split(SEP)
+    chunks, cur, cur_len = [], [], 0
+    for s in sections:
+        if cur and cur_len + len(s) > MAX_CHUNK:
+            chunks.append(SEP.join(cur))
+            cur, cur_len = [], 0
+        cur.append(s)
+        cur_len += len(s) + len(SEP)
+    if cur:
+        chunks.append(SEP.join(cur))
+    return chunks
+
+
 def build_doc_with_figures(title, body_xml, manifest, hero=None, hero_anchor=None):
-    xml = f"<title>{esc(title)}</title>\n{body_xml}"
-    res = lark("docs", "+create", "--content", "-", "--as", "user", inp=xml)
+    # A single oversized --content gets silently truncated, so build the body
+    # incrementally: create with the title + first chunk, then `append` the rest.
+    chunks = chunk_sections(body_xml) or [""]
+    res = lark("docs", "+create", "--content", "-", "--as", "user",
+               inp=f"<title>{esc(title)}</title>\n{chunks[0]}")
     doc = res["document"]
     did = doc["document_id"]
+    for ch in chunks[1:]:
+        lark("docs", "+update", "--api-version", "v2", "--doc", did,
+             "--command", "append", "--content", SEP + ch, "--as", "user")
+    if len(chunks) > 1:
+        print(f"  body appended in {len(chunks)} chunks")
     # Hero banner: insert the overview figure above the first section (under the title).
     if hero and hero_anchor:
         try:
