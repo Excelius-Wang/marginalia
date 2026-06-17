@@ -10,7 +10,12 @@
   ```bash
   lark-cli auth login --scope "docs:document.content:read docx:document:create docx:document:write_only docs:document.media:upload wiki:node:create base:table:create base:record:create base:record:update drive:file:upload"
   ```
-- 图表抽取依赖 poppler（`pdftotext`/`pdftoppm`）+ `pdf2image` + `Pillow`（均为脚本运行环境已具备）。无需 PyMuPDF。
+- **图表抽取后端**：优先 **PyMuPDF（fitz）几何定位**——读 PDF 的矢量绘图/图像/文字块坐标来圈定图，矢量图和位图一视同仁，比"渲染后猜像素"稳得多。装在项目级 venv 里（避开 PEP 668、不污染系统）：
+
+  ```bash
+  python3 -m venv .marginalia/venv && .marginalia/venv/bin/pip install pymupdf pdf2image Pillow
+  ```
+  发布脚本用这个 python 跑（才能用上 fitz）：`.marginalia/venv/bin/python skills/marginalia/scripts/publish_to_feishu.py ...`。没装 fitz 时自动退回 poppler（`pdftotext`/`pdftoppm` + Pillow）启发式。
 
 ## 用法
 
@@ -34,7 +39,9 @@ python3 skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md
 - Table 1 [p.2] 任务覆盖矩阵：...
 ```
 
-脚本（`extract_figures.py`）按 caption 定位 + 行/列墨迹密度裁剪：`pdftotext -bbox` 找 “Figure N / Table N” caption 的坐标，`pdf2image` 渲染该页，向上跳过 caption→图之间的空白、再找图上方的空白带定出图顶，并按列分栏选出 caption 所在的那一栏（处理双栏/侧边图）。
+`extract_figures.py` 定位图：fitz 后端找到以 “Figure N / Table N” 开头的 caption 行,再取其上方矢量绘图+图像块的并集(并用上方文字块钳住顶部),`clip` 渲染该区域。**难例**：首页有 logo/页眉等杂散图形、或图文并排(图在文字旁)的版式,纯几何会过裁——这类用下面的 `[box=...]` 手动指定。再普适的零样本方案需要版面检测模型(DocLayout-YOLO 等)或 pdffigures2,属于更重的依赖。
+
+**手动兜底 `[box=x0,y0,x1,y1]`**(PDF 点坐标)：在图标记里写,如 `Fig.7 [p.11] [box=335,200,545,455] MaPE 示意:…`,脚本直接裁这个框,绕过所有启发式。
 
 **版面（借鉴 Notion paper-reading 模板的形式）**：
 

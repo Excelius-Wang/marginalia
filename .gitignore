@@ -19,3 +19,4 @@ __pycache__/
 # marginalia: figure crops are derived from PDFs on publish (regenerated);
 # the Feishu mapping (.marginalia/feishu.json) IS tracked for idempotency.
 .marginalia/figs/
+.marginalia/venv/

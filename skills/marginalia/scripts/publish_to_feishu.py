@@ -39,7 +39,7 @@ COLOR = re.compile(r"\{\{([bpogr]):(.+?)\}\}", re.S)
 CMAP = {"b": "blue", "p": "purple", "o": "orange", "g": "green", "r": "red"}
 # Figure control tags ([p.N]/[hero]/[@anchor]) are parsing directives, not content;
 # parse_figures reads them off the raw md, so strip them from the rendered text.
-CONTROL_TAGS = re.compile(r"\s*\[(?:p\.\d+|hero|@[^\]]*)\]")
+CONTROL_TAGS = re.compile(r"\s*\[(?:p\.\d+|hero|@[^\]]*|box=[^\]]*)\]")
 ORDERED = re.compile(r"^(\s*)\d+\.\s+")
 TABLE_ROW = re.compile(r"^\s*\|.*\|\s*$")
 TABLE_SEP = re.compile(r"^\s*\|?[\s:|-]+\|[\s:|-]*$")
@@ -409,7 +409,7 @@ def parse_metadata(md):
 
 FIG_TAG = re.compile(
     r"(Fig\.?|Figure|Table)\s*(\d+)\s*\[p\.(\d+)\]\s*"
-    r"(\[hero\])?\s*(\[@[^\]]+\])?\s*(.*)$")
+    r"(\[hero\])?\s*(\[@[^\]]+\])?\s*(\[box=[\d.,\s]+\])?\s*(.*)$")
 
 
 def _clean_caption(text):
@@ -437,11 +437,15 @@ def parse_figures(md):
             continue
         seen.add((kind, num))
         anchor = m.group(5)[2:-1].strip() if m.group(5) else None
-        desc = _clean_caption(m.group(6))
+        box = None
+        if m.group(6):
+            nums = [float(v) for v in re.findall(r"[\d.]+", m.group(6))]
+            box = nums[:4] if len(nums) >= 4 else None
+        desc = _clean_caption(m.group(7))
         prefix = ("表" if kind == "Table" else "图") + num
         found.append({
             "label": f"{kind} {num}", "page": int(m.group(3)),
-            "hero": bool(m.group(4)), "anchor": anchor,
+            "hero": bool(m.group(4)), "anchor": anchor, "box": box,
             "caption": f"{prefix} {desc}" if desc else f"{kind} {num}",
         })
     return found
@@ -744,7 +748,7 @@ def main():
     manifest = []
     for f in figs:
         try:
-            m = ef.crop_artifact(args.pdf, f["page"], f["label"], fig_dir)
+            m = ef.crop_artifact(args.pdf, f["page"], f["label"], fig_dir, box=f.get("box"))
             m.update(caption=f["caption"], anchor=f["anchor"], hero=f["hero"])
             manifest.append(m)
         except Exception as e:  # noqa: BLE001
