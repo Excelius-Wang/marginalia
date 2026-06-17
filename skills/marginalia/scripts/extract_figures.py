@@ -218,7 +218,23 @@ def _crop_fitz(pdf, page, label, out_dir, dpi, box):
     path = out_dir / f"{slug}_p{page}.png"
     pix.save(path)
     return {"label": label, "page": page, "path": str(path),
-            "width": pix.width, "height": pix.height}
+            "width": pix.width, "height": pix.height,
+            "warn": crop_warning(pix.width, pix.height, pg.rect.width * z, pg.rect.height * z)}
+
+
+def crop_warning(w, h, page_w_px, page_h_px):
+    """Heuristics can't guarantee a clean crop, so flag a *likely*-bad one (fail
+    loud): tiny (missed the figure), extreme aspect (clipped to a strip), or
+    nearly page-tall (grabbed neighbouring content). Returns a reason or None."""
+    reasons = []
+    if min(w, h) < 130:
+        reasons.append(f"裁切过小 {w}x{h}（可能没截到图）")
+    ar = max(w / h, h / w)
+    if ar > 6:
+        reasons.append(f"长宽比异常 {w}x{h}（{ar:.0f}:1，可能截偏成条）")
+    if page_h_px and h > 0.85 * page_h_px:
+        reasons.append(f"高度≈整页（{h}/{page_h_px:.0f}，可能多截了相邻内容）")
+    return "；".join(reasons) or None
 
 
 def crop_artifact(pdf, page, label, out_dir, dpi=200, box=None):
@@ -295,7 +311,8 @@ def _crop_poppler(pdf, page, label, out_dir, dpi=200, box=None):
     path = out_dir / f"{slug}_p{page}.png"
     crop.save(path)
     return {"label": label, "page": page, "path": str(path),
-            "width": crop.size[0], "height": crop.size[1]}
+            "width": crop.size[0], "height": crop.size[1],
+            "warn": crop_warning(crop.size[0], crop.size[1], W, H)}
 
 
 def main():

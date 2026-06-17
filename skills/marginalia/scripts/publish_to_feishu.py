@@ -753,6 +753,12 @@ def main():
             manifest.append(m)
         except Exception as e:  # noqa: BLE001
             print(f"WARN figure {f['label']}@{f['page']}: {e}", file=sys.stderr)
+    # Surface likely-bad crops (non-blocking): heuristics can't guarantee a clean
+    # cut, so a suspicious one should be SEEN, not silently shipped.
+    for m in manifest:
+        if m.get("warn"):
+            print(f"FIG-LINT: {m['label']} 可能裁歪——{m['warn']}；核对图片或在标记里加 "
+                  f"[box=x0,y0,x1,y1]（PDF 点）。当前 {m['path']}", file=sys.stderr)
     # hero banners the top; figures with an [@anchor] go inline; the rest land in 图表.
     hero = next((m for m in manifest if m.get("hero")), None)
     inline_figs = [m for m in manifest if not m.get("hero") and m.get("anchor")]
