@@ -37,6 +37,9 @@ LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 #   o 橙=关键指标/数字结论  g 绿=正面判断/优势  r 红=风险/短板/批判
 COLOR = re.compile(r"\{\{([bpogr]):(.+?)\}\}", re.S)
 CMAP = {"b": "blue", "p": "purple", "o": "orange", "g": "green", "r": "red"}
+# Figure control tags ([p.N]/[hero]/[@anchor]) are parsing directives, not content;
+# parse_figures reads them off the raw md, so strip them from the rendered text.
+CONTROL_TAGS = re.compile(r"\s*\[(?:p\.\d+|hero|@[^\]]*)\]")
 ORDERED = re.compile(r"^(\s*)\d+\.\s+")
 TABLE_ROW = re.compile(r"^\s*\|.*\|\s*$")
 TABLE_SEP = re.compile(r"^\s*\|?[\s:|-]+\|[\s:|-]*$")
@@ -64,6 +67,7 @@ def inline(text):
     Order: protect code/latex/link spans as placeholders, apply bold on the
     remainder, escape literals, then restore placeholders.
     """
+    text = CONTROL_TAGS.sub("", text)   # drop figure directives ([p.N]/[hero]/[@...])
     slots = []
 
     def stash(html):
