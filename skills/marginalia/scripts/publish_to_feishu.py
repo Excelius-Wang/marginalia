@@ -231,6 +231,32 @@ def render_blocks(lines):
     return "".join(out)
 
 
+def lint_xml(xml):
+    """Catch malformed render output so broken docs never ship (fail loud).
+
+    Covers the failure classes the markup can silently produce: leftover
+    `{{`/`}}` (nested or mistyped color tags — color tags must NOT nest),
+    residual \\x00 placeholders (inline restore failed), and unbalanced
+    inline/style tags.
+    """
+    problems = []
+    # An unconsumed `{{c:` opener means a color tag failed to parse (nested or
+    # mistyped). Match the opener specifically — bare `{{`/`}}` occur in valid
+    # LaTeX (e.g. V_{\text{vae}}^{\text{clean}}) and must not false-positive.
+    m = re.search(r"\{\{[bpogr]:", xml)
+    if m:
+        ctx = xml[max(0, m.start() - 30):m.start() + 30].replace("\n", " ")
+        problems.append(f"未解析的颜色标记（颜色标记不可嵌套）: …{ctx}…")
+    if "\x00" in xml:
+        problems.append("残留占位符 \\x00：inline() 还原失败")
+    for tag in ("span", "b", "callout", "latex", "table", "td", "li"):
+        o = len(re.findall(rf"<{tag}[ >]", xml))
+        c = len(re.findall(rf"</{tag}>", xml))
+        if o != c:
+            problems.append(f"标签不平衡 <{tag}>：{o} 开 / {c} 闭")
+    return problems
+
+
 def split_sections(md):
     """Split a note into (doc_title, [(section_title, [body_lines]), ...])."""
     title = "Untitled"
@@ -668,12 +694,21 @@ def main():
     if end_figs:
         body_xml += SEP + h2("图表 (Figures)")
 
+    problems = lint_xml(body_xml)
+    if problems:
+        for p in problems:
+            print(f"LINT: {p}", file=sys.stderr)
+
     if args.dry_run:
         print(f"<title>{esc(title)}</title>\n{body_xml}")
         print(f"\n--- hero={hero['label'] if hero else None}; "
               f"inline={[(m['label'], m['anchor']) for m in inline_figs]}; "
-              f"end={[m['label'] for m in end_figs]} ---", file=sys.stderr)
+              f"end={[m['label'] for m in end_figs]}; lint={'OK' if not problems else 'FAIL'} ---",
+              file=sys.stderr)
         return
+
+    if problems:
+        sys.exit("渲染校验未通过，已中止发布（修好上面 LINT 指出的标记问题再发）。")
 
     auth_precheck()
     cfg = load_cfg()
