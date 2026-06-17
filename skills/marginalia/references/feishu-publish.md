@@ -1,6 +1,6 @@
 # 发布到飞书（Feishu Publish）
 
-把一篇本地 md 笔记发布成一篇飞书文档（带图表、公式、表格），挂进飞书知识库（Wiki），并在飞书多维表格（Base）索引里登记一行。md 仍是版本化的*源*，飞书是*渲染产物*。脚本确定性、幂等。
+把一篇本地 md 笔记发布成一篇飞书文档（带图表、公式、表格），挂进飞书知识库（Wiki），并在飞书多维表格（Base）索引里登记一行。**飞书文档是正式产物、Base 是唯一索引**；本地 md 只是 gitignore 的运行期中间产物（agent 写作的自然产出 + 脚本输入 + 可本地 grep/重发），不进 git。脚本确定性、幂等。
 
 ## 前置
 
@@ -92,7 +92,7 @@ md 里用 `$...$`（行内）或 `$$...$$`（展示）包裹的会转成飞书 `
 
 ## 幂等与映射
 
-`.marginalia/feishu.json`（提交进 git）记录：`wiki_space_id`、`domain_nodes`、`base_token`、`table_id`、以及每篇 `notes[path] = {doc_id, url, record_id, hash}`。
+`.marginalia/feishu.json`（**本地运行期映射，gitignore，不提交**）记录：`wiki_space_id`、`domain_nodes`、`base_token`、`table_id`、以及每篇 `notes[path] = {doc_id, url, record_id, hash}`。它支撑「原地更新同一篇飞书文档、URL 不变」——本机有效；换机器丢了就退化为新建（跨机器更新可后续加「从飞书 Base 反向重建映射」的工具）。
 
 - 笔记内容（忽略自动写回的 `- Feishu Doc:` 行）哈希未变 → 跳过（除非 `--force`）。
 - 变更 → **原地更新**同一篇文档（`docs +update --command overwrite` 清空正文后分块 `append` 重写，再重插图片），**URL 保持不变**。仅首次发布或旧文档已被删时才新建并挂进 Wiki。
@@ -101,7 +101,7 @@ md 里用 `$...$`（行内）或 `$$...$$`（展示）包裹的会转成飞书 `
 
 ## 失败兜底
 
-- 发布在 git commit 之前完成；发布失败应清楚报错，但不阻塞本地 md 的写入与提交。
+- 发布失败应清楚报错，但不影响本地 md 的写入（本地 md 是 gitignore 缓存，本就不提交）。
 - lark-cli 命令可能在 JSON 前打印进度行，脚本 `lark()` 会切出 JSON 段再解析。
 
 ## 已知局限（v1）

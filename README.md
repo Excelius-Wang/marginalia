@@ -29,8 +29,7 @@ It runs on both **Claude Code** and **Codex**, with a general domain plus plugga
 - Turns a paper **title / DOI / arXiv / OpenReview / publisher / GitHub / local PDF** into one structured note.
 - Emphasizes motivation, the basic idea, the reasoning behind the method, the evidence, the most fragile assumption, counterexamples, and your own takeaways.
 - Follows the TL;DR with a genuinely sharp `Sharp Verdict` — not a neutral recap.
-- Saves the note under `notes/`, backfills the README index, and commits/pushes.
-- Optionally **publishes each note to Feishu (Lark)** as a rich document with figures, formulas, and tables — filed into a Wiki tree by domain and indexed in a filterable Base table.
+- **Publishes each note to Feishu (Lark)** as the system of record — a rich document with figures, formulas, and tables, filed into a Wiki tree by domain and registered in a filterable Base index. The local markdown is a gitignored runtime cache (drafting buffer + grep + re-publish), not a versioned source.
 
 ## How it reads
 
@@ -53,9 +52,10 @@ marginalia/
 │   ├── references/           # progressive disclosure: method / schema / style / source / git / domains
 │   └── scripts/              # publish_to_feishu.py, extract_figures.py
 ├── .agent                    # Codex workflow file
-├── notes/                    # your paper notes (the knowledge base)
-└── examples/                 # example notes
+└── examples/                 # example notes (demo asset)
 ```
+
+> The knowledge base lives in **Feishu** (Wiki + Base), not in this repo. Local notes land under `notes/` and the publish mapping under `.marginalia/feishu.json` — both gitignored runtime caches, not versioned.
 
 ## Install
 
@@ -81,8 +81,8 @@ cp .agent /path/to/your-paper-repo/.agent
 
 ```text
 Deep-read this paper: https://arxiv.org/abs/1706.03762
-Read /path/to/paper.pdf and file it under notes/ml/
-Deep-read "Attention Is All You Need" and backfill the index
+Read /path/to/paper.pdf and publish it to Feishu under ml/
+Deep-read "Attention Is All You Need" and publish it
 ```
 
 ## Note style
@@ -93,7 +93,7 @@ The template is a ceiling, not a checklist — trim sections that don't fit the 
 
 ## Publish to Feishu (Lark)
 
-Publish each note as a Feishu document with native figures, formulas, and tables, filed into a Wiki tree (by domain) and registered in a filterable Base table. The local markdown stays the **version-controlled source**; Feishu is the **rendered artifact**. Details in [`feishu-publish.md`](skills/marginalia/references/feishu-publish.md).
+Each note is published as a Feishu document with native figures, formulas, and tables, filed into a Wiki tree (by domain) and registered in a filterable Base table. **Feishu is the system of record and the only index**; the local markdown is a gitignored runtime cache. Details in [`feishu-publish.md`](skills/marginalia/references/feishu-publish.md).
 
 ```bash
 # requires `lark-cli auth login` (user identity) first
@@ -105,17 +105,9 @@ Highlights:
 - **Semantic rendering** — signature sections become colored callouts; Strengths/Limitations a side-by-side grid; a top "reading guide" callout carries a color legend and a fast-path through the signature sections.
 - **Figures** — extracted geometrically from the PDF via PyMuPDF; `[hero]` banners the overview figure, `[@anchor]` inlines a figure next to its discussion, `[box=...]` overrides a bad crop manually.
 - **Fail-loud lint gates** — malformed color tags, unbalanced XML, broken LaTeX (brace / `\left`-`\right` / `\begin`-`\end` balance), and bad anchors **abort the publish** instead of shipping broken.
-- **Idempotent & stable URLs** — re-publishing updates the same doc in place; cross-links to other notes in the base resolve to their Feishu URLs while the markdown keeps portable relative paths.
+- **Idempotent & stable URLs** — re-publishing updates the same doc in place (on the same machine, via the local mapping); cross-links to other notes resolve to their Feishu URLs while the markdown keeps portable relative paths.
 
-Idempotency mapping lives in `.marginalia/feishu.json`; derived figures in `.marginalia/figs/` (gitignored).
-
-## Paper index
-
-> The Feishu Base table is the filterable primary index; the table below is an offline mirror. Register a note on creation; flip `TODO`→`DONE` once the file exists.
-
-| Venue / Year | Title | Domain | Note | Status |
-| --- | --- | --- | --- | --- |
-| NeurIPS 2017 | Attention Is All You Need (example template) | ml | `examples/【NeurIPS‘2017】attention-is-all-you-need.md` | DONE (example) |
+The idempotency mapping (`.marginalia/feishu.json`) and derived figures (`.marginalia/figs/`) are gitignored runtime caches. The **Feishu Base table is the filterable index** — there is no in-repo paper list. An example note lives in [`examples/`](examples/).
 
 ## Roadmap
 

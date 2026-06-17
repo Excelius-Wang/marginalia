@@ -29,8 +29,7 @@
 - 把论文**标题 / DOI / arXiv / OpenReview / 出版社 / GitHub / 本地 PDF** 变成一份结构化中文笔记。
 - 强调动机、basic idea、方法推理、证据、最脆弱假设、反例与个人 takeaway。
 - TL;DR 之后给一段够狠的 `毒舌评论`——不是中性复述。
-- 笔记落到 `notes/`，回填 README 索引，并 commit/push。
-- 可选**发布到飞书（Lark）**：每篇笔记发布成带图表、公式、表格的文档，按领域挂进知识库（Wiki）树，并在多维表格（Base）里登记成可筛选索引。
+- **发布到飞书（Lark）作为正式产物**：每篇笔记发布成带图表、公式、表格的文档，按领域挂进知识库（Wiki）树，并在多维表格（Base）里登记成可筛选索引。本地 md 是 gitignore 的运行期缓存（写作草稿 + grep + 重发），不是版本化的源。
 
 ## 它怎么读
 
@@ -53,9 +52,10 @@ marginalia/
 │   ├── references/           # 按需加载：流程 / 模板 / 风格 / 来源解析 / git / 领域
 │   └── scripts/              # publish_to_feishu.py、extract_figures.py
 ├── .agent                    # Codex 工作流文件
-├── notes/                    # 你的论文笔记（知识库）
-└── examples/                 # 示例笔记
+└── examples/                 # 示例笔记（演示资产）
 ```
+
+> 知识库在**飞书**（Wiki + Base），不在本仓库。本地 md 笔记落在 `notes/`、发布映射在 `.marginalia/feishu.json`——两者都是 gitignore 的运行期缓存，不版本化。
 
 ## 安装
 
@@ -81,8 +81,8 @@ cp .agent /path/to/your-paper-repo/.agent
 
 ```text
 精读这篇论文：https://arxiv.org/abs/1706.03762
-读一下 /path/to/paper.pdf，整理到 notes/ml/
-精读 Attention Is All You Need，并按索引规范回填
+读一下 /path/to/paper.pdf，发布到飞书 ml/ 领域
+精读 Attention Is All You Need，并发布到飞书
 ```
 
 ## 笔记风格
@@ -93,7 +93,7 @@ cp .agent /path/to/your-paper-repo/.agent
 
 ## 发布到飞书（Lark）
 
-把每篇笔记发布成带原生图表、公式、表格的飞书文档，按领域挂进知识库（Wiki）树，并在多维表格（Base）登记可筛选索引。本地 md 仍是**版本化的源**，飞书是**渲染产物**。详见 [`feishu-publish.md`](skills/marginalia/references/feishu-publish.md)。
+把每篇笔记发布成带原生图表、公式、表格的飞书文档，按领域挂进知识库（Wiki）树，并在多维表格（Base）登记可筛选索引。**飞书是正式产物，也是唯一索引**；本地 md 是 gitignore 的运行期缓存。详见 [`feishu-publish.md`](skills/marginalia/references/feishu-publish.md)。
 
 ```bash
 # 需先 lark-cli auth login（用户身份）
@@ -105,17 +105,9 @@ python3 skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md
 - **语义渲染**——招牌小节渲染成彩色 callout，优势/局限并排成 grid，顶部「导读」callout 给出配色图例 + 招牌小节的速读路径。
 - **图表**——用 PyMuPDF 从 PDF 几何抽取；`[hero]` 把概览图做头图，`[@锚点]` 把图穿插到对应讨论处，`[box=...]` 手动框定裁歪的图。
 - **fail-loud 校验门禁**——颜色标记嵌套、XML 不平衡、LaTeX 损坏（花括号 / `\left`-`\right` / `\begin`-`\end` 配对）、锚点失配都会**中止发布**，绝不带病上线。
-- **幂等且 URL 稳定**——重发原地更新同一篇文档；指向库内其他笔记的交叉链接会解析成对方的飞书 URL，而本地 md 保持可移植的相对路径。
+- **幂等且 URL 稳定**——重发原地更新同一篇文档（同一台机器上靠本地映射）；指向库内其他笔记的交叉链接会解析成对方的飞书 URL，而本地 md 保持可移植的相对路径。
 
-幂等映射记于 `.marginalia/feishu.json`；派生图在 `.marginalia/figs/`（已 gitignore）。
-
-## 论文索引
-
-> 飞书多维表格是可筛选的主索引；下表为离线备查。新增笔记时登记，`TODO`→`DONE` 在笔记文件存在后再改。
-
-| Venue / Year | Title | 领域 | 笔记 | Status |
-| --- | --- | --- | --- | --- |
-| NeurIPS 2017 | Attention Is All You Need（示例模板） | ml | `examples/【NeurIPS‘2017】attention-is-all-you-need.md` | DONE (example) |
+幂等映射 `.marginalia/feishu.json` 与派生图 `.marginalia/figs/` 都是 gitignore 的运行期缓存。**飞书多维表格（Base）是可筛选的索引**——仓库里不再维护论文清单。示例笔记见 [`examples/`](examples/) 目录。
 
 ## 后续
 

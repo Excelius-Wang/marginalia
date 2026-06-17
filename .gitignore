@@ -16,7 +16,11 @@ __pycache__/
 # Misc
 *.log
 
-# marginalia: figure crops are derived from PDFs on publish (regenerated);
-# the Feishu mapping (.marginalia/feishu.json) IS tracked for idempotency.
+# marginalia: notes + the Feishu mapping are local runtime artifacts, NOT
+# versioned. Feishu (Wiki + Base) is the system of record; the local md notes
+# and .marginalia/feishu.json are a runtime cache that backs re-publish /
+# in-place update on the same machine. Figure crops are derived from PDFs.
+notes/
+.marginalia/feishu.json
 .marginalia/figs/
 .marginalia/venv/
