@@ -115,10 +115,6 @@ Idempotency mapping lives in `.marginalia/feishu.json`; derived figures in `.mar
 
 | Venue / Year | Title | Domain | Note | Status |
 | --- | --- | --- | --- | --- |
-| NeurIPS 2017 | Attention Is All You Need | ml | `notes/ml/【NeurIPS‘2017】attention-is-all-you-need.md` | DONE |
-| arXiv 2026 | Lance: Unified Multimodal Modeling by Multi-Task Synergy | ml | `notes/ml/【arXiv‘2026】lance-unified-multimodal.md` | DONE |
-| arXiv 2026 | Towards On-Policy SFT: Distribution Discriminant Theory | ml | `notes/ml/【arXiv‘2026】towards-on-policy-sft.md` | DONE |
-| NeurIPS 2025 | Think-RM: Enabling Long-Horizon Reasoning in Generative Reward Models | ml | `notes/ml/【NeurIPS‘2025】think-rm-long-horizon-reasoning-genrm.md` | DONE |
 | NeurIPS 2017 | Attention Is All You Need (example template) | ml | `examples/【NeurIPS‘2017】attention-is-all-you-need.md` | DONE (example) |
 
 ## Roadmap
