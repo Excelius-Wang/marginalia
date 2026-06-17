@@ -103,7 +103,10 @@ def parse_table(lines, i):
         f'<th background-color="light-gray"><b>{inline(c)}</b></th>' for c in head) + "</tr>"
     tbody = "".join("<tr>" + "".join(f"<td>{inline(c)}</td>" for c in row) + "</tr>"
                     for row in body_rows)
-    return f"<table><thead>{thead}</thead><tbody>{tbody}</tbody></table>", i
+    # colgroup distributes ~810px across columns so the table spans the page.
+    w = max(80, 810 // max(1, len(head)))
+    colgroup = "<colgroup>" + f'<col width="{w}"/>' * len(head) + "</colgroup>"
+    return f"<table>{colgroup}<thead>{thead}</thead><tbody>{tbody}</tbody></table>", i
 
 
 def render_blocks(lines):
@@ -303,28 +306,44 @@ def parse_metadata(md):
     return meta
 
 
+FIG_TAG = re.compile(
+    r"(Fig\.?|Figure|Table)\s*(\d+)\s*\[p\.(\d+)\]\s*"
+    r"(\[hero\])?\s*(\[@[^\]]+\])?\s*(.*)$")
+
+
+def _clean_caption(text):
+    """Strip note markup ({{c:..}}, **bold**, `code`, $latex$) for a clean caption."""
+    text = re.sub(r"\{\{[bpogr]:(.+?)\}\}", r"\1", text)
+    text = text.replace("**", "").replace("`", "").replace("$", "")
+    return text.strip().lstrip("：:").strip()
+
+
 def parse_figures(md):
-    """Find `Fig.N [p.P]` / `Figure N [p.P]` tags -> [(label, page), ...] (deduped)."""
-    found, seen = [], set()
-    for m in re.finditer(r"(?:Fig\.?|Figure|Table)\s*(\d+)\s*\[p\.(\d+)\]", md):
-        kind = "Table" if md[m.start():m.start() + 5].lower().startswith("table") else "Figure"
-        key = (kind, m.group(1))
-        if key not in seen:
-            seen.add(key)
-            found.append((f"{kind} {m.group(1)}", int(m.group(2))))
-    return found
+    """Parse `Fig.N [p.P] [hero] [@anchor] 描述` tags from Key Artifacts bullets.
 
-
-def parse_hero(md):
-    """Find the figure tagged `[hero]` (the overview/architecture banner) -> label.
-
-    e.g. `Fig.6 [p.9] [hero] 架构总览` -> "Figure 6". Returns None if untagged.
+    Returns deduped [{label, page, hero, anchor, caption}, ...]. `caption` is the
+    描述 after the tag (prefixed 图N/表N); `anchor` (from `[@文本]`) places the
+    figure inline after the block matching that text, else it lands in 图表 section.
     """
-    m = re.search(r"(?:Fig\.?|Figure|Table)\s*(\d+)\s*\[p\.\d+\]\s*\[hero\]", md)
-    if not m:
-        return None
-    kind = "Table" if md[m.start():m.start() + 5].lower().startswith("table") else "Figure"
-    return f"{kind} {m.group(1)}"
+    found, seen = [], set()
+    for line in md.splitlines():
+        m = FIG_TAG.search(line)
+        if not m:
+            continue
+        kind = "Table" if m.group(1).lower().startswith("table") else "Figure"
+        num = m.group(2)
+        if (kind, num) in seen:
+            continue
+        seen.add((kind, num))
+        anchor = m.group(5)[2:-1].strip() if m.group(5) else None
+        desc = _clean_caption(m.group(6))
+        prefix = ("表" if kind == "Table" else "图") + num
+        found.append({
+            "label": f"{kind} {num}", "page": int(m.group(3)),
+            "hero": bool(m.group(4)), "anchor": anchor,
+            "caption": f"{prefix} {desc}" if desc else f"{kind} {num}",
+        })
+    return found
 
 
 # ---------------------------------------------------------------- lark-cli
@@ -521,35 +540,58 @@ def chunk_sections(body_xml):
     return chunks
 
 
-def build_doc_with_figures(title, body_xml, manifest, hero=None, hero_anchor=None):
-    # A single oversized --content gets silently truncated, so build the body
-    # incrementally: create with the title + first chunk, then `append` the rest.
+def _insert_media(did, m, *, width=None, anchor=None, before=False):
+    args = ["docs", "+media-insert", "--doc", did, "--file", m["path"],
+            "--caption", m.get("caption", m["label"]), "--align", "center", "--as", "user"]
+    if width:
+        args += ["--width", str(width)]
+    if anchor:
+        args += ["--selection-with-ellipsis", anchor]
+        if before:
+            args += ["--before"]
+    lark(*args)
+
+
+def build_doc_body(title, body_xml, hero, inline_figs, end_figs, hero_anchor, doc_id=None):
+    """Build/refresh the doc body. If doc_id is given, overwrite it in place
+    (stable URL); otherwise create a new doc. Oversized --content is silently
+    truncated, so write the title + first chunk, then `append` the rest.
+    """
     chunks = chunk_sections(body_xml) or [""]
-    res = lark("docs", "+create", "--content", "-", "--as", "user",
-               inp=f"<title>{esc(title)}</title>\n{chunks[0]}")
-    doc = res["document"]
-    did = doc["document_id"]
+    head = f"<title>{esc(title)}</title>\n{chunks[0]}"
+    if doc_id:
+        lark("docs", "+update", "--api-version", "v2", "--doc", doc_id,
+             "--command", "overwrite", "--content", "-", "--as", "user", inp=head)
+        did, url = doc_id, None
+    else:
+        doc = lark("docs", "+create", "--content", "-", "--as", "user", inp=head)["document"]
+        did, url = doc["document_id"], doc["url"]
     for ch in chunks[1:]:
         lark("docs", "+update", "--api-version", "v2", "--doc", did,
              "--command", "append", "--content", SEP + ch, "--as", "user")
     if len(chunks) > 1:
-        print(f"  body appended in {len(chunks)} chunks")
-    # Hero banner: insert the overview figure above the first section (under the title).
+        print(f"  body {'overwritten' if doc_id else 'created'} in {len(chunks)} chunks")
+    # Hero banner above the first section; inline figures after their anchor text;
+    # the rest appended under the 图表 section. media-insert falls back to append.
     if hero and hero_anchor:
         try:
-            lark("docs", "+media-insert", "--doc", did, "--file", hero["path"],
-                 "--align", "center", "--width", "720",
-                 "--selection-with-ellipsis", hero_anchor, "--before", "--as", "user")
-            print(f"  hero banner {hero['label']} -> top")
-        except Exception as e:  # noqa: BLE001 - fall back to appending it with the rest
-            print(f"WARN hero insert failed ({e.__class__.__name__}); appending instead",
+            _insert_media(did, hero, width=720, anchor=hero_anchor, before=True)
+            print(f"  hero {hero['label']} -> top")
+        except Exception as e:  # noqa: BLE001
+            print(f"WARN hero insert failed ({e.__class__.__name__}); appending", file=sys.stderr)
+            end_figs = [hero] + end_figs
+    for m in inline_figs:
+        try:
+            _insert_media(did, m, anchor=m["anchor"])
+            print(f"  inserted {m['label']} @ '{m['anchor'][:18]}'")
+        except Exception as e:  # noqa: BLE001
+            print(f"WARN inline insert {m['label']} failed ({e.__class__.__name__}); appending",
                   file=sys.stderr)
-            manifest = [hero] + manifest
-    for m in manifest:
-        lark("docs", "+media-insert", "--doc", did, "--file", m["path"],
-             "--caption", m["label"], "--align", "center", "--as", "user")
+            end_figs.append(m)
+    for m in end_figs:
+        _insert_media(did, m)
         print(f"  inserted {m['label']}")
-    return did, doc["url"]
+    return did, url
 
 
 # ---------------------------------------------------------------- main
@@ -569,31 +611,31 @@ def main():
     title, body_xml = md_to_docx_xml(md)
     meta = parse_metadata(md)
     figs = parse_figures(md) if args.pdf else []
-    hero_label = parse_hero(md) if args.pdf else None
     _, sections = split_sections(md)
     hero_anchor = sections[0][0] if sections else None   # first section heading text
 
     fig_dir = Path(".marginalia/figs") / note_path.stem   # relative: lark needs cwd-relative paths
     fig_dir.mkdir(parents=True, exist_ok=True)
     manifest = []
-    if figs and args.pdf:
-        for label, page in figs:
-            try:
-                manifest.append(ef.crop_artifact(args.pdf, page, label, fig_dir))
-            except Exception as e:  # noqa: BLE001
-                print(f"WARN figure {label}@{page}: {e}", file=sys.stderr)
-    # Pull the hero out so it banners the top; the rest go in a "图表 Figures" section.
-    hero = next((m for m in manifest if m["label"] == hero_label), None)
-    rest = [m for m in manifest if m is not hero]
-    if rest:
-        body_xml += "\n<hr/>\n" + h2("图表 (Figures)")
+    for f in figs:
+        try:
+            m = ef.crop_artifact(args.pdf, f["page"], f["label"], fig_dir)
+            m.update(caption=f["caption"], anchor=f["anchor"], hero=f["hero"])
+            manifest.append(m)
+        except Exception as e:  # noqa: BLE001
+            print(f"WARN figure {f['label']}@{f['page']}: {e}", file=sys.stderr)
+    # hero banners the top; figures with an [@anchor] go inline; the rest land in 图表.
+    hero = next((m for m in manifest if m.get("hero")), None)
+    inline_figs = [m for m in manifest if not m.get("hero") and m.get("anchor")]
+    end_figs = [m for m in manifest if not m.get("hero") and not m.get("anchor")]
+    if end_figs:
+        body_xml += SEP + h2("图表 (Figures)")
 
     if args.dry_run:
         print(f"<title>{esc(title)}</title>\n{body_xml}")
-        print(f"\n--- hero: {hero['label'] if hero else None}; {len(rest)} more figures ---",
-              file=sys.stderr)
-        for m in manifest:
-            print(f"  {m['label']}  {m['width']}x{m['height']}  {m['path']}", file=sys.stderr)
+        print(f"\n--- hero={hero['label'] if hero else None}; "
+              f"inline={[(m['label'], m['anchor']) for m in inline_figs]}; "
+              f"end={[m['label'] for m in end_figs]} ---", file=sys.stderr)
         return
 
     auth_precheck()
@@ -604,53 +646,44 @@ def main():
         print(f"unchanged, skipping: {prev.get('url')}")
         return
 
-    # (Re)create the doc. On change, delete the stale doc first. A doc filed into
-    # a Wiki node is removed via `wiki +node-delete` keyed on its *node* token
-    # (not the docx obj token); fall back to drive +delete for un-filed docs.
+    # In-place update keeps the URL stable: reuse the existing doc via `overwrite`.
+    # Only create (and file into Wiki) on first publish or if the old doc is gone.
+    node_token = prev.get("node_token") if prev else None
+    doc_id = doc_url = None
     if prev and prev.get("doc_id"):
-        node_tok = prev.get("node_token")
         try:
-            if node_tok:
-                # node_tok is a *wiki node* token -> obj-type wiki (NOT docx, which
-                # would make the CLI treat it as a docx obj token and 404).
-                dargs = ["wiki", "+node-delete", "--node-token", node_tok,
-                         "--obj-type", "wiki", "--yes", "--as", "user"]
-                if cfg.get("wiki_space_id"):
-                    dargs += ["--space-id", str(cfg["wiki_space_id"])]
-                lark(*dargs)
-            else:
-                lark("drive", "+delete", "--file-token", prev["doc_id"], "--type", "docx",
-                     "--yes", "--as", "user")
-            print(f"deleted old doc {prev['doc_id']}")
+            doc_id, _ = build_doc_body(title, body_xml, hero, inline_figs, end_figs,
+                                       hero_anchor, doc_id=prev["doc_id"])
+            doc_url = prev.get("url")
+            print(f"updated in place: {doc_url}")
         except Exception as e:  # noqa: BLE001
-            print(f"WARN could not delete old doc: {e}", file=sys.stderr)
-
-    doc_id, doc_url = build_doc_with_figures(title, body_xml, rest, hero=hero,
-                                             hero_anchor=hero_anchor)
-    print(f"doc: {doc_url}")
-
-    # Place under the Wiki domain node, capturing the new node token (needed to
-    # delete this doc cleanly on a future republish).
-    node = ensure_domain_node(cfg, domain)
-    space = cfg["wiki_space_id"]
-    node_token = None
-    try:
-        mv = lark("wiki", "+move", "--obj-token", doc_id, "--obj-type", "docx",
-                  "--target-space-id", space, "--target-parent-token", node, "--as", "user")
-        node_token = dig(mv, "node_token", ("node", "node_token"))
-        print(f"moved into wiki/{domain}")
-    except Exception as e:  # noqa: BLE001
-        print(f"WARN wiki move failed: {e}", file=sys.stderr)
-    if not node_token:                               # resolve via node-list by obj_token
+            print(f"WARN in-place update failed ({e.__class__.__name__}); creating fresh",
+                  file=sys.stderr)
+            doc_id = None
+    if not doc_id:
+        doc_id, doc_url = build_doc_body(title, body_xml, hero, inline_figs, end_figs, hero_anchor)
+        print(f"doc: {doc_url}")
+        # File the new doc under the Wiki domain node, capturing its node token.
+        node = ensure_domain_node(cfg, domain)
+        space = cfg["wiki_space_id"]
+        node_token = None
         try:
-            nl = lark("wiki", "+node-list", "--space-id", str(space),
-                      "--parent-node-token", node, "--as", "user")
-            for it in (nl.get("nodes") or []):
-                if it.get("obj_token") == doc_id:
-                    node_token = it.get("node_token")
-                    break
-        except Exception:  # noqa: BLE001
-            pass
+            mv = lark("wiki", "+move", "--obj-token", doc_id, "--obj-type", "docx",
+                      "--target-space-id", space, "--target-parent-token", node, "--as", "user")
+            node_token = dig(mv, "node_token", ("node", "node_token"))
+            print(f"moved into wiki/{domain}")
+        except Exception as e:  # noqa: BLE001
+            print(f"WARN wiki move failed: {e}", file=sys.stderr)
+        if not node_token:                           # resolve via node-list by obj_token
+            try:
+                nl = lark("wiki", "+node-list", "--space-id", str(space),
+                          "--parent-node-token", node, "--as", "user")
+                for it in (nl.get("nodes") or []):
+                    if it.get("obj_token") == doc_id:
+                        node_token = it.get("node_token")
+                        break
+            except Exception:  # noqa: BLE001
+                pass
 
     # Upsert the Base index row.
     bt, tid = ensure_base(cfg)

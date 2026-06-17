@@ -38,9 +38,10 @@ python3 skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md
 
 **版面（借鉴 Notion paper-reading 模板的形式）**：
 
-- **顶部 banner**：给最能概览全文的那张图（通常是架构总览）在标记后加 `[hero]`，例如 `Fig.6 [p.9] [hero] 架构总览：…`。脚本会把它以 720px 居中插到正文最前（首节之前），像论文头图。未标 `[hero]` 则没有头图。
-- **其余关键图**聚到文档末尾的「图表 Figures」节，按序、带 caption。
-- **小节之间自动插分隔线**（`<hr/>`），与 callout 一起承担视觉节奏（标题保持黑色，不额外染色，避免与语义色打架）。
+- **顶部 banner**：给最能概览全文的那张图（通常是架构总览）在标记后加 `[hero]`，例如 `Fig.6 [p.9] [hero] 架构总览：…`。脚本会把它以 720px 居中插到正文最前（首节之前）。
+- **图穿插正文**：给图加 `[@锚文本]` 锚点（一段正文里**唯一**的短句），脚本用 `--selection-with-ellipsis` 把它插到那个块之后，例如 `Fig.1 [p.1] [@各任务反而互相增益] 雷达图：…`。没标 `[@...]` 的图统一落到文末「图表」节。
+- **描述性 caption**：图的 caption 自动取 `[p.N]`（及标记）之后的那段描述文字，并加「图N/表N」前缀，不再是干巴巴的 "Figure 1"。
+- **小节之间自动插分隔线**（`<hr/>`），标题彩色加粗承担视觉节奏。
 
 ## 语义渲染（页面美观）
 
@@ -82,9 +83,9 @@ md 里用 `$...$` 包裹的会转成飞书内联 `<latex>`。飞书 v2 只支持
 `.marginalia/feishu.json`（提交进 git）记录：`wiki_space_id`、`domain_nodes`、`base_token`、`table_id`、以及每篇 `notes[path] = {doc_id, url, record_id, hash}`。
 
 - 笔记内容（忽略自动写回的 `- Feishu Doc:` 行）哈希未变 → 跳过（除非 `--force`）。
-- 变更 → 删除旧文档后重建，Base 行按 `Note` 主键更新（不新建重复行）。每篇映射额外存 `node_token`：删旧文档走 `wiki +node-delete --obj-type wiki --yes`（文档已挂进 Wiki，必须按 *node* token 删，不能用 docx obj token，也不能用 `drive +delete`）。
+- 变更 → **原地更新**同一篇文档（`docs +update --command overwrite` 清空正文后分块 `append` 重写，再重插图片），**URL 保持不变**。仅首次发布或旧文档已被删时才新建并挂进 Wiki。
+- Base 行按 `Note` 主键更新（不新建重复行）；映射存 `doc_id`/`node_token`/`record_id`/`hash`。
 - 发布成功后把飞书文档 URL 写回笔记 Metadata 的 `- Feishu Doc:` 行。
-- 注意：删除-重建会换新的文档 URL（脚本已自动写回笔记与映射）。内容没变时不重发，URL 即保持稳定。
 
 ## 失败兜底
 
@@ -93,6 +94,7 @@ md 里用 `$...$` 包裹的会转成飞书内联 `<latex>`。飞书 v2 只支持
 
 ## 已知局限（v1）
 
-- 向量复合图自动裁剪不完美；除 `[hero]` 头图外，其余图聚在「图表」节而非穿插到讨论处。
-- 仅内联公式；展示公式 best-effort。
-- 嵌套列表支持两层。
+- 向量复合图自动裁剪不完美。
+- 图穿插靠 `[@锚文本]` 手动指定（锚文本要在正文里唯一）；未标的图落到文末「图表」节。
+- 公式用 `<latex>`（行内/单独成段）；飞书无独立公式块。
+- 嵌套列表支持两层。表格用 `<colgroup>` 撑满页宽。
