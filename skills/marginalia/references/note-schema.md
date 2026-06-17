@@ -147,6 +147,6 @@
 - **分清归属。** 用散文表述时，把"论文展示的"和"读者推出的"分开。
 - **Scope/Subfield 要窄。** 写论文真正的小研究方向，不是堆关键词；具体词表见对应的 `domains/<领域>.md`。
 - **关键图打页码。** `Key Artifacts` 里的关键图/表加 `[p.N]`（如 `Fig.6 [p.9]`），发布到飞书时据此从 PDF 抽图（见 `feishu-publish.md`）。给最能概览全文的那张图（通常是架构总览）再加 `[hero]`（如 `Fig.6 [p.9] [hero]`），它会被插到飞书文档最前作为头图。
-- **公式用内联。** 关键公式用 `$...$` 包裹，发布到飞书会渲染成内联 latex。
+- **公式用真 LaTeX。** 关键公式用 `$...$`（行内）或 `$$...$$`（单独成段的展示式）包裹，并写成真正的 LaTeX 语法（`\sum`、`\mathbb{E}`、`\lVert\rVert`、`\theta`、`_{下标}`、`^{上标}` 等），不要用 `Σ`/`‖`/`θ` 之类的 unicode 拼。发布到飞书会渲染成 `<latex>` 真正排版出来。
 - **Feishu Doc 自动写回。** `- Feishu Doc:` 行由发布脚本自动填，无需手填。
 - **标题稳定触发美化。** 发布脚本按固定小节标题做语义渲染（`TL;DR`/`毒舌评论`/`核心 Intuition`/`最脆弱的假设`/`My Takeaways`/`Follow-up Research Idea`→彩色 callout，`Strengths`+`Limitations`→并排 grid，`Metadata`→表格）。改了这些标题会退回普通段落，映射详见 `feishu-publish.md`。

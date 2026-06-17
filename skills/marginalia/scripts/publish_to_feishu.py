@@ -27,6 +27,7 @@ import extract_figures as ef
 # ---------------------------------------------------------------- md -> DocxXML
 
 INLINE_CODE = re.compile(r"`([^`]+)`")
+DISPLAY_LATEX = re.compile(r"\$\$(.+?)\$\$", re.S)
 INLINE_LATEX = re.compile(r"\$([^$]+)\$")
 BOLD = re.compile(r"\*\*([^*]+)\*\*")
 LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
@@ -75,6 +76,8 @@ def inline(text):
         text)
     text = LINK.sub(lambda m: stash(f'<a href="{esc(m.group(2))}">{esc(m.group(1))}</a>'), text)
     text = INLINE_CODE.sub(lambda m: stash(f"<code>{esc(m.group(1))}</code>"), text)
+    # $$...$$ display and $...$ inline both map to Feishu's inline <latex>.
+    text = DISPLAY_LATEX.sub(lambda m: stash(f"<latex>{esc(m.group(1).strip())}</latex>"), text)
     text = INLINE_LATEX.sub(lambda m: stash(f"<latex>{esc(m.group(1))}</latex>"), text)
     text = BOLD.sub(lambda m: stash(f"<b>{esc(m.group(1))}</b>"), text)
     # escape whatever literal text remains (placeholders use \x00 sentinels)
@@ -213,8 +216,8 @@ def callout(emoji, color, inner):
 
 
 def h2(title, color="blue"):
-    """Colored section heading (matches the reference's blue/colored headers)."""
-    return f'<h2><span text-color="{color}">{inline(title)}</span></h2>'
+    """Bold colored section heading (<b> outside <span> per the XML nesting order)."""
+    return f'<h2><b><span text-color="{color}">{inline(title)}</span></b></h2>'
 
 
 def render_metadata(body):
@@ -238,8 +241,8 @@ def render_grid_pair(left, right):
     rt, rb = right
     lcol = callout("✅", "green", f"<p><b>{inline(lt)}</b></p>" + render_blocks(lb))
     rcol = callout("🚧", "orange", f"<p><b>{inline(rt)}</b></p>" + render_blocks(rb))
-    return (f'<h2><span text-color="green">{inline(lt)}</span>'
-            f' / <span text-color="orange">{inline(rt)}</span></h2>'
+    return (f'<h2><b><span text-color="green">{inline(lt)}</span>'
+            f' / <span text-color="orange">{inline(rt)}</span></b></h2>'
             f'<grid><column width-ratio="0.5">{lcol}</column>'
             f'<column width-ratio="0.5">{rcol}</column></grid>')
 
@@ -581,7 +584,7 @@ def main():
     hero = next((m for m in manifest if m["label"] == hero_label), None)
     rest = [m for m in manifest if m is not hero]
     if rest:
-        body_xml += "\n<hr/>\n<h2>图表 Figures</h2>"
+        body_xml += "\n<hr/>\n" + h2("图表 Figures")
 
     if args.dry_run:
         print(f"<title>{esc(title)}</title>\n{body_xml}")
