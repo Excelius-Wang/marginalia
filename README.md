@@ -1,7 +1,7 @@
 # Marginalia
 
 <p align="center">
-  <em>Turn a paper into a durable, reusable deep-reading note — not a loose summary.</em>
+  <em>Read a paper deeply — and publish it as a rich Feishu document, not a loose summary.</em>
 </p>
 
 <p align="center">
@@ -17,10 +17,12 @@
 
 ---
 
-**Marginalia** (the notes scribbled in a book's margins) is a **deep paper-reading skill**: active critical reading plus a persistent knowledge base. It fuses the strengths of two projects —
+**Marginalia** (the notes scribbled in a book's margins) is a **deep paper-reading skill**. In one line: *it reads a paper deeply and publishes it as a Feishu document — the git repo holds only the skill; the notes and the knowledge base live in Feishu.*
+
+It fuses the strengths of two projects —
 
 - The **"brain"** of deep reading, after [FeijiangHan/PaperForge](https://github.com/FeijiangHan/PaperForge): reconstruct the author's reasoning, surface the most fragile assumption, design the strongest counterexample, propose non-incremental follow-up ideas, keep source discipline, and write with style.
-- The **"body"** of persistence, after [LazyDreamingDog/paper-reading-workflow](https://github.com/LazyDreamingDog/paper-reading-workflow): a unified note template, a `Sharp Verdict`, a git knowledge base, and a README index.
+- The **"body"** of persistence, after [LazyDreamingDog/paper-reading-workflow](https://github.com/LazyDreamingDog/paper-reading-workflow): a unified note template and a `Sharp Verdict` — persisted to a **Feishu** knowledge base (Wiki tree + filterable Base index).
 
 It runs on both **Claude Code** and **Codex**, with a general domain plus pluggable per-domain profiles.
 
@@ -33,14 +35,7 @@ It runs on both **Claude Code** and **Codex**, with a general domain plus plugga
 
 ## How it reads
 
-Not a paraphrase of the abstract. The skill runs a disciplined internal method (see [`reading-method.md`](skills/marginalia/references/reading-method.md)):
-
-1. **Resolve the source** and read it through.
-2. **Three passes** — problem & claims → method & mechanism → evidence.
-3. **Calibrate novelty** against 2–3 nearest prior works.
-4. **Reconstruct the author's idea** using only what was known *before* this paper.
-5. **Critical synthesis** — treat the paper as something to be challenged.
-6. **Number re-check** — verify every cited figure/table number against the source before a sharp claim leans on it.
+Not a paraphrase of the abstract. The skill runs a disciplined internal method (full version in [`reading-method.md`](skills/marginalia/references/reading-method.md)): three passes (claims → mechanism → evidence) → calibrate novelty against the nearest prior work → reconstruct the author's idea from only what was known *before* the paper → critical synthesis that treats the paper as something to be challenged → a final number re-check so no sharp claim leans on a misread figure.
 
 ## Repository layout
 

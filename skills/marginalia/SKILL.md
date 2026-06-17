@@ -1,13 +1,13 @@
 ---
 name: marginalia
-description: 深度精读学术论文，产出结构化的中文研究笔记，带批判性分析——重建作者思路、机制层面讲清方法、找出最脆弱的假设、设计反例、提出非增量的 follow-up 研究方向，把笔记沉淀进 git 知识库（notes/ + README 索引），并可发布成带图表/公式的飞书文档（Wiki 知识库 + 多维表格索引）。当用户给出论文标题、DOI、arXiv/OpenReview/出版社/GitHub/PDF 链接或本地 PDF，或要求 精读/阅读/总结/分析/批判/复现/归纳贡献/比较相关工作/设计反例/提出后续研究/维护论文索引/发布到飞书/同步到飞书，或要 read / summarize / critique / deep-read a paper、design a minimal reproduction or counterexample、propose follow-up research、publish to Feishu 时使用。适用于 ML、NLP、CV、systems、安全、区块链、生物、经济等领域。
+description: 深度精读学术论文，产出结构化的中文研究笔记，带批判性分析——重建作者思路、机制层面讲清方法、找出最脆弱的假设、设计反例、提出非增量的 follow-up 研究方向，并发布成带图表/公式的飞书文档（飞书 Wiki 知识库 + 多维表格索引为正式产物；本地 md 仅运行期缓存，不进 git）。当用户给出论文标题、DOI、arXiv/OpenReview/出版社/GitHub/PDF 链接或本地 PDF，或要求 精读/阅读/总结/分析/批判/复现/归纳贡献/比较相关工作/设计反例/提出后续研究/发布到飞书/同步到飞书，或要 read / summarize / critique / deep-read a paper、design a minimal reproduction or counterexample、propose follow-up research、publish to Feishu 时使用。适用于 ML、NLP、CV、systems、安全、区块链、生物、经济等领域。
 ---
 
 # Marginalia 论文精读
 
 ## 概览（Overview）
 
-用这个 skill 把一篇论文变成一份**可长期复用的中文研究笔记**，而不是一段松散摘要。三个优先级：事实落地、显式标注不确定性、和用户已有知识库建立连接。
+用这个 skill 把一篇论文**读透并发布成一份图文飞书文档**，而不是一段松散摘要。一句话定位：**仓库只装 skill;笔记是本地运行期缓存;知识库与索引都在飞书。** 三个优先级：事实落地、显式标注不确定性、和已读论文建立连接。
 
 精读不是复述 abstract。真正的贡献和真正的问题往往藏在 method、实验细节、图表、limitations 和 appendix 里。
 

@@ -1,4 +1,4 @@
 interface:
   display_name: "Marginalia 论文精读"
-  short_description: "深度精读论文，产出带批判性分析的中文笔记，并维护 git 知识库。"
-  default_prompt: "精读这篇论文，做批判性分析（重建作者思路、最脆弱假设、反例、follow-up idea），整理成中文笔记，写到 notes/ 并按 README 索引规范回填、提交。"
+  short_description: "深度精读论文，产出带批判性分析的中文笔记，并发布成飞书文档（飞书是知识库与索引）。"
+  default_prompt: "精读这篇论文，做批判性分析（重建作者思路、最脆弱假设、反例、follow-up idea），整理成中文笔记并发布到飞书（Wiki + 多维表格索引）。"

@@ -1,7 +1,7 @@
 # Marginalia
 
 <p align="center">
-  <em>把一篇论文变成一份可长期复用的深度笔记，而不是一段松散摘要。</em>
+  <em>把论文读透，并发布成一份图文飞书文档，而不是一段松散摘要。</em>
 </p>
 
 <p align="center">
@@ -17,10 +17,12 @@
 
 ---
 
-**Marginalia**（书页边的批注）是一个**论文精读 skill**：深度主动阅读 + 持久化知识库。它融合两个项目的长处——
+**Marginalia**（书页边的批注）是一个**论文精读 skill**。一句话：*把一篇论文读透并发布成飞书文档——git 仓库只装 skill,笔记和知识库都在飞书。*
+
+它融合两个项目的长处——
 
 - 深度阅读的**「大脑」**参考 [FeijiangHan/PaperForge](https://github.com/FeijiangHan/PaperForge)：重建作者思路、最脆弱的假设、最强反例、非增量 follow-up idea、信息来源纪律、写作风格。
-- 持久化的**「身体」**参考 [LazyDreamingDog/paper-reading-workflow](https://github.com/LazyDreamingDog/paper-reading-workflow)：统一笔记模板、`毒舌评论`、git 知识库、README 索引。
+- 持久化的**「身体」**参考 [LazyDreamingDog/paper-reading-workflow](https://github.com/LazyDreamingDog/paper-reading-workflow)：统一笔记模板、`毒舌评论`——持久化到**飞书**知识库（Wiki 树 + 可筛选 Base 索引）。
 
 同时支持 **Claude Code** 和 **Codex**，通用领域 + 可插拔领域 profile。
 
@@ -33,14 +35,7 @@
 
 ## 它怎么读
 
-不是复述 abstract。skill 内部跑一套有纪律的精读流程（见 [`reading-method.md`](skills/marginalia/references/reading-method.md)）：
-
-1. **解析来源**并通读全文。
-2. **三遍阅读**——问题与主张 → 方法与机制 → 证据。
-3. **校准 novelty**：对比 2–3 篇最接近的 prior work。
-4. **重建作者思路**：只用这篇论文之前已存在的知识。
-5. **批判性综合**：把论文当成需要被质疑的对象。
-6. **读数复核**：每个引用的图/表数字都回原文核对，绝不让读错的数字撑起一句狠话。
+不是复述 abstract。skill 内部跑一套有纪律的精读流程（完整版见 [`reading-method.md`](skills/marginalia/references/reading-method.md)）：三遍阅读（主张 → 机制 → 证据）→ 对比最接近的 prior work 校准 novelty → 只用论文之前已有的知识重建作者思路 → 把论文当作要被质疑的对象做批判性综合 → 最后做读数复核,不让任何狠话撑在读错的数字上。
 
 ## 仓库结构
 
