@@ -198,6 +198,16 @@ def _crop_fitz(pdf, page, label, out_dir, dpi, box):
               if b.get("type") == 0 and fitz.Rect(b["bbox"]).y1 <= rect.y0 + 2]
         if tb:
             rect.y0 = max(rect.y0, max(t.y1 for t in tb))
+        # Pull in the figure's own text labels (axis/legend/edge text like
+        # "Distribution: ✓") — within the figure's vertical band and horizontally
+        # adjacent to the graphics — so the crop doesn't clip them. Bounded x-gap
+        # keeps a neighbouring text column (side-by-side layout) out.
+        for ln in (l for b in pg.get_text("dict")["blocks"] if b.get("type") == 0
+                   for l in b["lines"]):
+            r = fitz.Rect(ln["bbox"])
+            if (r.y0 >= rect.y0 - 2 and r.y1 <= cap.y0 + 1
+                    and r.x1 >= rect.x0 - 30 and r.x0 <= rect.x1 + 40):
+                rect |= r
         rect |= cap                       # include the caption line
         rect &= pg.rect                   # keep inside the page
     z = dpi / 72.0
