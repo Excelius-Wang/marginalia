@@ -88,24 +88,57 @@ def inline(text):
     return out
 
 
+def _disp_width(t):
+    """Rough display width: CJK/full-width counts as 2, others 1."""
+    return sum(2 if ord(ch) > 0x2E80 else 1 for ch in t)
+
+
+def _plain_cell(t):
+    """Strip note markup so a cell can be measured / alignment-detected."""
+    t = re.sub(r"\{\{[bpogr]:(.+?)\}\}", r"\1", t)
+    return t.replace("**", "").replace("`", "").replace("$", "").strip()
+
+
 def parse_table(lines, i):
-    """Parse a GFM pipe table starting at lines[i]. Returns (xml, next_i)."""
+    """Parse a GFM pipe table -> DocxXML with content-proportional column widths
+    and centered numeric columns. Returns (xml, next_i)."""
     def cells(row):
-        parts = [c.strip() for c in row.strip().strip("|").split("|")]
-        return parts
+        return [c.strip() for c in row.strip().strip("|").split("|")]
     head = cells(lines[i])
+    ncol = len(head)
     body_rows = []
     i += 2  # skip header + separator
     while i < len(lines) and TABLE_ROW.match(lines[i]):
         body_rows.append(cells(lines[i]))
         i += 1
+
+    def col(j):  # all plain cell texts in column j (header + body)
+        out = [_plain_cell(head[j])]
+        out += [_plain_cell(r[j]) for r in body_rows if j < len(r)]
+        return out
+
+    # Column widths ∝ widest cell (capped so one long prose cell can't starve the rest).
+    weights = [min(40, max((_disp_width(x) for x in col(j)), default=1)) for j in range(ncol)]
+    tot = sum(weights) or 1
+    widths = [max(64, round(w / tot * 820)) for w in weights]
+    # Center a column only if every body cell is short and contains a digit (number cols).
+    aligns = []
+    for j in range(ncol):
+        body = [_plain_cell(r[j]) for r in body_rows if j < len(r)]
+        center = bool(body) and all(_disp_width(x) <= 8 and any(c.isdigit() for c in x)
+                                    for x in body)
+        aligns.append("center" if center else "left")
+
+    def wrap(content, j):
+        return f'<p align="center">{content}</p>' if aligns[j] == "center" else content
+
     thead = "<tr>" + "".join(
-        f'<th background-color="light-gray"><b>{inline(c)}</b></th>' for c in head) + "</tr>"
-    tbody = "".join("<tr>" + "".join(f"<td>{inline(c)}</td>" for c in row) + "</tr>"
-                    for row in body_rows)
-    # colgroup distributes ~810px across columns so the table spans the page.
-    w = max(80, 810 // max(1, len(head)))
-    colgroup = "<colgroup>" + f'<col width="{w}"/>' * len(head) + "</colgroup>"
+        f'<th background-color="light-gray">{wrap(f"<b>{inline(head[j])}</b>", j)}</th>'
+        for j in range(ncol)) + "</tr>"
+    tbody = "".join(
+        "<tr>" + "".join(f"<td>{wrap(inline(r[j]), j)}</td>" for j in range(len(r))) + "</tr>"
+        for r in body_rows)
+    colgroup = "<colgroup>" + "".join(f'<col width="{w}"/>' for w in widths) + "</colgroup>"
     return f"<table>{colgroup}<thead>{thead}</thead><tbody>{tbody}</tbody></table>", i
 
 
