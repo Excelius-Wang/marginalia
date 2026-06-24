@@ -24,3 +24,8 @@ notes/
 .marginalia/feishu.json
 .marginalia/figs/
 .marginalia/venv/
+
+# Local demo assets — Feishu screenshots / exported PDFs kept while iterating on
+# the skill. They can show internal-network UI/URLs, so keep them out of this
+# public repo (un-ignore deliberately if you ever want a sanitized preview in).
+assets/
