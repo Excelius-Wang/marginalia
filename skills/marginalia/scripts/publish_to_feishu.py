@@ -29,6 +29,12 @@ import extract_figures as ef
 INLINE_CODE = re.compile(r"`([^`]+)`")
 DISPLAY_LATEX = re.compile(r"\$\$(.+?)\$\$", re.S)
 INLINE_LATEX = re.compile(r"\$([^$]+)\$")
+# A literal dollar (currency: $173, $0.75/M) is written escaped as `\$`, so it is never
+# mistaken for a `$...$` delimiter — `$...$` is ALWAYS math, including digit-leading like
+# `$2^{n}$`. inline() turns `\$` into a literal $; lint_latex strips `\$` the same way and
+# flags any formula fragment that swallowed CJK prose (the tell-tale of a forgotten escape)
+# so a desync fails loud instead of silently corrupting the render.
+ESCAPED_DOLLAR = re.compile(r"\\\$")
 BOLD = re.compile(r"\*\*([^*]+)\*\*")
 LINK = re.compile(r"\[([^\]]+)\]\(([^)]+)\)")
 # Semantic inline color the agent authors in the note: {{c:term}} -> colored span.
@@ -82,6 +88,8 @@ def inline(text):
     text = INLINE_CODE.sub(lambda m: stash(f"<code>{esc(m.group(1))}</code>"), text)
     # $$...$$ display and $...$ inline both map to Feishu's inline <latex>.
     text = DISPLAY_LATEX.sub(lambda m: stash(f"<latex>{esc(m.group(1).strip())}</latex>"), text)
+    # `\$` is an escaped literal dollar (currency); hide it before $...$ pairing, after $$.
+    text = ESCAPED_DOLLAR.sub(lambda m: stash("$"), text)
     text = INLINE_LATEX.sub(lambda m: stash(f"<latex>{esc(m.group(1))}</latex>"), text)
     text = BOLD.sub(lambda m: stash(f"<b>{esc(m.group(1))}</b>"), text)
     # escape whatever literal text remains (placeholders use \x00 sentinels)
@@ -161,13 +169,18 @@ def render_blocks(lines):
             return
         tag = list_type
         attr = ' seq="auto"' if tag == "ol" else ""
-        # one level of nesting: indent >= 2 spaces -> child list inside prev <li>
+        # one level of nesting: indent >= 2 spaces -> child list inside prev <li>.
+        # Nest only when a top-level <li> already exists to hang the child list on
+        # (have_parent). A list that *starts* indented (no parent — e.g. an ordered
+        # sub-list right after a bullet was flushed) would otherwise emit an unmatched
+        # </li>; demote those leading items to top level instead.
         html = f"<{tag}{attr}>"
         prev_nested = False
+        have_parent = False
         for indent, txt in list_buf:
-            if indent >= 2:
+            if indent >= 2 and have_parent:
                 if not prev_nested:
-                    html = html[:-5] if html.endswith("</li>") else html  # reopen last li
+                    html = html[:-5]   # reopen the previous top-level <li> to nest inside it
                     html += f"<{tag}{attr}><li>{inline(txt)}</li>"
                     prev_nested = True
                 else:
@@ -177,6 +190,7 @@ def render_blocks(lines):
                     html += f"</{tag}></li>"
                     prev_nested = False
                 html += f"<li>{inline(txt)}</li>"
+                have_parent = True
         if prev_nested:
             html += f"</{tag}></li>"
         html += f"</{tag}>"
@@ -264,19 +278,30 @@ def lint_xml(xml):
 
 
 def lint_latex(md):
-    """Structurally validate every $…$/$$…$$ fragment so a malformed formula
-    aborts instead of rendering broken in Feishu (latex is the only payload that
-    had no gate). Structural only — brace / \\left-\\right / \\begin-\\end balance
-    and emptiness — so it never false-positives on valid KaTeX the way a stricter
-    local engine (matplotlib mathtext) would."""
+    """Structurally validate every $…$/$$…$$ fragment so a malformed formula aborts
+    instead of rendering broken in Feishu (latex is the only payload that had no gate).
+    Checks brace / \\left-\\right / \\begin-\\end balance and emptiness — structural, so it
+    won't false-positive on valid KaTeX the way matplotlib mathtext would. Plus one semantic
+    guard: a fragment containing CJK is almost certainly an unescaped currency `$` that
+    paired with a later `$` and swallowed prose, so flag it (write `\\$` / 「美元」)."""
     problems = []
-    frags = [m.group(1) for m in re.finditer(r"\$\$(.+?)\$\$", md, re.S)]
-    rest = re.sub(r"\$\$.+?\$\$", "", md, flags=re.S)
-    frags += [m.group(1) for m in re.finditer(r"\$([^$]+)\$", rest)]
+    # Match the renderer: `\$` is an escaped literal dollar (currency), not a delimiter, so
+    # strip it before pairing. Reuse DISPLAY/INLINE_LATEX so the gate and render agree.
+    src = ESCAPED_DOLLAR.sub("", md)
+    frags = [m.group(1) for m in DISPLAY_LATEX.finditer(src)]
+    rest = DISPLAY_LATEX.sub("", src)
+    frags += [m.group(1) for m in INLINE_LATEX.finditer(rest)]
     for f in frags:
         snip = re.sub(r"\s+", " ", f).strip()[:40]
         if not f.strip():
             problems.append("空公式 $…$（删掉或补内容）")
+            continue
+        # CJK inside a formula almost always means an unescaped currency `$` paired with a
+        # later `$` and swallowed prose — the desync that else silently corrupts the render.
+        # Flag it loud (covers $173-style AND $2^n-style desyncs).
+        if re.search(r"[一-鿿]", f):
+            problems.append(f"公式片段含中文（多半是未转义的金额 `$` 把正文吞成了公式）："
+                            f"金额写成 `\\$` 或「美元」；若确要在公式里写中文请挪到公式外：${snip}…$")
             continue
         body = f.replace("\\{", "").replace("\\}", "")  # ignore literal escaped braces
         if body.count("{") != body.count("}"):
