@@ -91,8 +91,9 @@ The template is a ceiling, not a checklist — trim sections that don't fit the 
 Each note is published as a Feishu document with native figures, formulas, and tables, filed into a Wiki tree (by domain) and registered in a filterable Base table. **Feishu is the system of record and the only index**; the local markdown is a gitignored runtime cache. Details in [`feishu-publish.md`](skills/marginalia/references/feishu-publish.md).
 
 ```bash
-# requires `lark-cli auth login` (user identity) first
-python3 skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md" --pdf /path/to/paper.pdf
+# requires `lark-cli auth login` (user identity) first; use the project venv's
+# python so PyMuPDF/pdf2image resolve (a bare `python3` will ModuleNotFoundError)
+.marginalia/venv/bin/python skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md" --pdf /path/to/paper.pdf
 ```
 
 Highlights:

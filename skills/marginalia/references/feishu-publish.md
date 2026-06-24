@@ -8,21 +8,21 @@
 - 已登录用户身份：`lark-cli auth status` 显示 `identities.user.available = true`。否则：
 
   ```bash
-  lark-cli auth login --scope "docs:document.content:read docx:document:create docx:document:write_only docs:document.media:upload wiki:node:create base:table:create base:record:create base:record:update drive:file:upload"
+  lark-cli auth login --scope "docs:document.content:read docx:document:create docx:document:write_only docs:document.media:upload wiki:node:create wiki:space:write_only base:table:create base:record:create base:record:update drive:file:upload"
   ```
 - **图表抽取后端**：优先 **PyMuPDF（fitz）几何定位**——读 PDF 的矢量绘图/图像/文字块坐标来圈定图，矢量图和位图一视同仁，比"渲染后猜像素"稳得多。装在项目级 venv 里（避开 PEP 668、不污染系统）：
 
   ```bash
   python3 -m venv .marginalia/venv && .marginalia/venv/bin/pip install pymupdf pdf2image Pillow
   ```
-  发布脚本用这个 python 跑（才能用上 fitz）：`.marginalia/venv/bin/python skills/marginalia/scripts/publish_to_feishu.py ...`。没装 fitz 时自动退回 poppler（`pdftotext`/`pdftoppm` + Pillow）启发式。
+  发布脚本**必须**用这个 venv 的 python 跑：`.marginalia/venv/bin/python skills/marginalia/scripts/publish_to_feishu.py ...`。脚本一加载就 `import extract_figures`，后者在模块顶层 `import pdf2image / PIL`——这些和 fitz 都只装在 venv，裸 `python3` 会直接 `ModuleNotFoundError`。venv 内即便 fitz 缺失，`crop_artifact` 会退回 poppler（`pdftotext`/`pdftoppm` + Pillow）启发式；但 poppler 后端同样依赖 venv 里的 pdf2image/Pillow，所以这个回退只在 venv 内成立，换不回系统 python。
 
 ## 用法
 
 在仓库根目录运行（lark-cli 要求 `--file` 为相对 cwd 的路径）：
 
 ```bash
-python3 skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md" --pdf /path/to/paper.pdf
+.marginalia/venv/bin/python skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md" --pdf /path/to/paper.pdf
 ```
 
 - `--pdf` 省略则只发文字（不抽图）。
@@ -59,16 +59,18 @@ python3 skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md
 
 脚本不是把 md 平铺成灰色段落，而是按**固定小节标题**做语义路由，套用飞书的彩色块（参考开源 skill `pretty-lark-doc` 的渲染层）。保持 `note-schema.md` 的标准标题，美化才会触发：
 
-| 小节标题（前缀匹配） | 渲染 | 颜色 / emoji |
+脚本按**中文前缀**匹配（取「中文 (English)」标题里的中文部分，如 `## 一句话总结 (TL;DR)` 匹配 `一句话总结`），与 `note-schema.md` 的标准标题和 `publish_to_feishu.py` 的 `CALLOUT_SECTIONS` 一致：
+
+| 小节标题（中文前缀匹配） | 渲染 | 颜色 / emoji |
 | --- | --- | --- |
-| `Metadata` | 两列表格（字段名灰底加粗） | gray |
-| `TL;DR` | callout | 蓝 💡 |
+| `元数据` | 两列表格（字段名灰底加粗） | gray |
+| `一句话总结` | callout | 蓝 💡 |
 | `毒舌评论` | callout | 红 🔴 |
-| `核心 Intuition` | callout | 紫 ✨ |
+| `核心直觉` | callout | 紫 ✨ |
 | `最脆弱的假设` | callout | 橙 ❗ |
-| `My Takeaways` | callout | 绿 ✅ |
-| `Follow-up Research Idea` | callout | 紫 🚀 |
-| `Strengths` + `Limitations`（相邻） | 左右并排 grid，各自 callout | 绿 ✅ / 橙 🚧 |
+| `我的判断` | callout | 绿 ✅ |
+| `后续研究设想` | callout | 紫 🚀 |
+| `优势` + `局限`（相邻） | 左右并排 grid，各自 callout | 绿 ✅ / 橙 🚧 |
 | 其余小节 | 普通标题 + 块 | — |
 
 **章节标题彩色**：每个 `## ` 标题渲染成彩色（callout 小节用其语义色，其余蓝色），呼应参考排版的彩色标题。

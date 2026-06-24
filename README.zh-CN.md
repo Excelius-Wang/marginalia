@@ -91,8 +91,9 @@ cp .agent /path/to/your-paper-repo/.agent
 把每篇笔记发布成带原生图表、公式、表格的飞书文档，按领域挂进知识库（Wiki）树，并在多维表格（Base）登记可筛选索引。**飞书是正式产物，也是唯一索引**；本地 md 是 gitignore 的运行期缓存。详见 [`feishu-publish.md`](skills/marginalia/references/feishu-publish.md)。
 
 ```bash
-# 需先 lark-cli auth login（用户身份）
-python3 skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md" --pdf /path/to/paper.pdf
+# 需先 lark-cli auth login（用户身份）；用项目 venv 的 python，PyMuPDF/pdf2image 才解析得到
+# （直接用裸 python3 会 ModuleNotFoundError）
+.marginalia/venv/bin/python skills/marginalia/scripts/publish_to_feishu.py "notes/<domain>/<note>.md" --pdf /path/to/paper.pdf
 ```
 
 亮点：
