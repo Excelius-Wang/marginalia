@@ -83,6 +83,32 @@ def ordered_sublist_after_bullet_balanced():
     assert not [p for p in P.lint_xml(xml) if "li" in p], P.lint_xml(xml)
 
 
+@case
+def oversized_atomic_block_is_caught():
+    # a callout/grid/table renders to ONE atomic block that can't be split; above
+    # MAX_CHUNK its lone chunk would blow Feishu's --content cap and truncate on
+    # send, so the size gate must fail loud (one ceiling = MAX_CHUNK, not 8000).
+    huge = "<callout>" + "x" * (P.MAX_CHUNK + 400) + "</callout>"
+    assert any("原子块过长" in p for p in P.lint_xml(huge)), P.lint_xml(huge)
+
+
+@case
+def normal_sized_block_passes_size_gate():
+    ok = "<callout>" + "x" * 400 + "</callout>"
+    assert not [p for p in P.lint_xml(ok) if "原子块" in p], P.lint_xml(ok)
+
+
+@case
+def caption_keeps_literal_currency():
+    # `\$` is a literal dollar -> caption shows `$173`, not a stray backslash
+    assert P._clean_caption(r"成本 \$173/万次") == "成本 $173/万次", P._clean_caption(r"成本 \$173/万次")
+
+
+@case
+def caption_drops_formula_delimiters():
+    assert "$" not in P._clean_caption("复杂度 $O(n)$ 对比"), P._clean_caption("复杂度 $O(n)$ 对比")
+
+
 def main():
     failed = 0
     for fn in CASES:

@@ -270,10 +270,11 @@ def lint_xml(xml):
         c = len(re.findall(rf"</{tag}>", xml))
         if o != c:
             problems.append(f"标签不平衡 <{tag}>：{o} 开 / {c} 闭")
-    big = [b for b in top_level_blocks(xml) if len(b) > HARD_BLOCK]
+    big = [b for b in top_level_blocks(xml) if len(b) > MAX_CHUNK]
     if big:
-        problems.append(f"单个块过长（{len(big[0])}>{HARD_BLOCK}），无法安全分块发布——"
-                        f"把该小节拆出子标题/拆段：…{big[0][:50]}…")
+        problems.append(f"单个原子块过长（{len(big[0])}>{MAX_CHUNK}＝单次写入上限），不可再分；"
+                        f"整块发送会撑爆飞书 --content 参数限制被截断——把该小节拆出子标题/拆段："
+                        f"…{big[0][:50]}…")
     return problems
 
 
@@ -485,9 +486,12 @@ FIG_TAG = re.compile(
 
 
 def _clean_caption(text):
-    """Strip note markup ({{c:..}}, **bold**, `code`, $latex$) for a clean caption."""
+    """Strip note markup ({{c:..}}, **bold**, `code`, $latex$) for a clean caption.
+    A literal currency `\\$` survives as `$`; only formula-delimiter `$` is dropped."""
     text = re.sub(r"\{\{[bpogr]:(.+?)\}\}", r"\1", text)
+    text = text.replace("\\$", "\x00D\x00")          # protect literal currency `\$`
     text = text.replace("**", "").replace("`", "").replace("$", "")
+    text = text.replace("\x00D\x00", "$")            # restore it after dropping $-delimiters
     return text.strip().lstrip("：:").strip()
 
 
@@ -721,8 +725,15 @@ def writeback_url(note_path, md, doc_url):
 
 
 SEP = "\n<hr/>\n"
-MAX_CHUNK = 3000   # `docs +create`/`append` truncate on oversized --content; chunk under this
-HARD_BLOCK = 8000  # a single atomic block above this can't be chunked safely -> lint fails
+# Feishu caps how much DocxXML one `docs +create` / `+update --command append` call
+# accepts (lark-doc-create.md warns an oversized --content "容易触发参数限制"; the docs
+# guide's advice is skeleton-first + segmented appends — no public char count). chunk_body
+# packs top-level blocks up to MAX_CHUNK per call, so a single ATOMIC block (callout / grid
+# / table — can't be split) must ALSO stay <= MAX_CHUNK, else its lone chunk blows the cap
+# and truncates. The lint gate enforces that one ceiling and tells the author to split the
+# section. (Previously a 3000 pack-target sat under a separate 8000 lint ceiling, so a
+# 3000–8000 atomic block slipped through and silently truncated — one scale closes the gap.)
+MAX_CHUNK = 3000
 
 _TAG = re.compile(r"<(/?)([a-zA-Z0-9]+)\b[^>]*?(/?)>")
 

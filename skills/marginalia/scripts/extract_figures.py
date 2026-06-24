@@ -2,15 +2,19 @@
 """Extract paper figures/tables from a PDF as cropped PNGs.
 
 Given a source PDF and a list of `LABEL@PAGE` specs (e.g. "Figure 6@9"),
-locate each artifact's caption via `pdftotext -bbox`, then crop the page
-image (rendered with pdf2image) to the artifact region using a row-ink-density
-gap heuristic, trimming surrounding whitespace.
+locate each artifact and crop it as a PNG. Two backends (see crop_artifact):
+  - primary: PyMuPDF/fitz geometry — read the PDF's own caption / drawing /
+    image block coordinates (vector + raster handled uniformly).
+  - fallback: poppler (`pdftotext -bbox`) + pdf2image render + a Pillow
+    ink-bbox heuristic, used only when PyMuPDF isn't importable.
 
 This module is deliberately Lark-independent and deterministic — it is the
 "figure source" half of the Feishu publishing pipeline. Placement/upload is
 handled separately (see references/feishu-publish.md).
 
-Requires: poppler (pdftotext), pdf2image, Pillow. No PyMuPDF needed.
+Requires: Pillow always; PyMuPDF (fitz) for the primary backend; poppler +
+pdf2image only for the fallback (imported lazily, so the fitz path runs
+without them installed).
 
 Usage:
     python3 extract_figures.py --pdf paper.pdf --out figs/ \
@@ -26,8 +30,9 @@ import sys
 from html import unescape
 from pathlib import Path
 
-from pdf2image import convert_from_path
 from PIL import Image, ImageChops, ImageDraw
+# pdf2image (needs the poppler binary) is imported lazily inside _crop_poppler so
+# the primary PyMuPDF/fitz backend imports and runs without poppler installed.
 
 WORD_RE = re.compile(
     r'<word xMin="([\d.]+)" yMin="([\d.]+)" xMax="([\d.]+)" yMax="([\d.]+)">(.*?)</word>'
@@ -251,6 +256,7 @@ def crop_artifact(pdf, page, label, out_dir, dpi=200, box=None):
 
 
 def _crop_poppler(pdf, page, label, out_dir, dpi=200, box=None):
+    from pdf2image import convert_from_path   # lazy: only the fallback needs poppler
     pw, ph, words = page_words(pdf, page)
     band = find_caption_band(words, label)
     img = convert_from_path(pdf, dpi=dpi, first_page=page, last_page=page)[0].convert("RGB")
