@@ -109,6 +109,51 @@ def caption_drops_formula_delimiters():
     assert "$" not in P._clean_caption("复杂度 $O(n)$ 对比"), P._clean_caption("复杂度 $O(n)$ 对比")
 
 
+@case
+def top_level_blocks_preserve_atomic_structure():
+    # a chunk boundary must never split a callout/table; join reconstructs exactly
+    xml = ('<callout><p>a</p><p>b</p></callout><p>c</p>'
+           '<table><tbody><tr><td>x</td></tr></tbody></table>')
+    blocks = P.top_level_blocks(xml)
+    assert blocks == ['<callout><p>a</p><p>b</p></callout>', '<p>c</p>',
+                      '<table><tbody><tr><td>x</td></tr></tbody></table>'], blocks
+    assert "".join(blocks) == xml, "join must reconstruct the xml exactly"
+
+
+@case
+def chunk_body_packs_under_max_chunk_losslessly():
+    blocks = "".join("<p>" + "x" * 1000 + "</p>" for _ in range(5))
+    chunks = P.chunk_body(blocks)
+    assert all(len(c) <= P.MAX_CHUNK for c in chunks), [len(c) for c in chunks]
+    assert "".join(chunks) == blocks, "chunking must not add or drop content"
+
+
+@case
+def xref_links_rewrite_only_published_intra_library():
+    from pathlib import Path
+    cfg = {"notes": {"notes/ml/b.md": {"url": "https://feishu/b"}}}
+    md = "见 [B](b.md)、[未发布](c.md)、[外部](https://x.com/page)。"
+    out = P.resolve_xref_links(md, Path("notes/ml/a.md"), cfg)
+    assert "https://feishu/b" in out and "](b.md)" not in out, out   # published -> URL
+    assert "(c.md)" in out, out                                      # unpublished -> as-is
+    assert "https://x.com/page" in out, out                          # external -> untouched
+
+
+@case
+def parse_figures_reads_all_tags_and_dedups():
+    md = ("- Fig.1 [p.3] [hero] 架构总览\n"
+          "- Figure 2 [p.4] [@多头注意力] 多头注意力示意\n"
+          "- Table 1 [p.2] [box=100,200,300,400] 任务矩阵\n"
+          "- Fig.1 [p.3] 重复一行应被去重\n")
+    figs = P.parse_figures(md)
+    assert len(figs) == 3, figs                                      # Fig.1 deduped
+    assert figs[0]["hero"] and figs[0]["page"] == 3, figs[0]
+    assert figs[0]["caption"].startswith("图1"), figs[0]
+    assert figs[1]["anchor"] == "多头注意力", figs[1]
+    assert figs[2]["label"] == "Table 1" and figs[2]["box"] == [100, 200, 300, 400], figs[2]
+    assert figs[2]["caption"].startswith("表1"), figs[2]
+
+
 def main():
     failed = 0
     for fn in CASES:
