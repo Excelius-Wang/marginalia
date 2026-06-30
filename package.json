@@ -1,0 +1,24 @@
+{
+  "name": "marginalia-codex-skill",
+  "version": "0.1.0",
+  "description": "Installer for the Marginalia Codex skill.",
+  "license": "MIT",
+  "bin": {
+    "marginalia-codex-skill": "bin/install-codex-skill.js"
+  },
+  "files": [
+    ".agent",
+    "bin/install-codex-skill.js",
+    "skills/marginalia/SKILL.md",
+    "skills/marginalia/agents/",
+    "skills/marginalia/references/",
+    "skills/marginalia/scripts/*.py"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Excelius-Wang/marginalia.git"
+  }
+}
