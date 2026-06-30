@@ -76,7 +76,7 @@ npx marginalia-codex-skill --agent-dir /path/to/your-paper-repo
 直接从 GitHub 安装：
 
 ```bash
-npx github:Excelius-Wang/marginalia
+npx --package github:Excelius-Wang/marginalia marginalia-codex-skill
 ```
 
 手动安装：
