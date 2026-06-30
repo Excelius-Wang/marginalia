@@ -65,6 +65,22 @@ Then just drop a paper link or title into the conversation — the skill trigger
 
 ### Codex
 
+After publishing to npm:
+
+```bash
+npx marginalia-codex-skill
+# optional: also place the workflow file in your paper knowledge base
+npx marginalia-codex-skill --agent-dir /path/to/your-paper-repo
+```
+
+Directly from GitHub:
+
+```bash
+npx github:Excelius-Wang/marginalia
+```
+
+Manual install:
+
 ```bash
 mkdir -p ~/.codex/skills
 cp -R skills/marginalia ~/.codex/skills/
