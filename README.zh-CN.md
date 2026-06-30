@@ -65,6 +65,22 @@ cp -R skills/marginalia ~/.claude/skills/marginalia
 
 ### Codex
 
+发布到 npm 后：
+
+```bash
+npx marginalia-codex-skill
+# 可选：同时把工作流文件放到你的论文知识库根目录
+npx marginalia-codex-skill --agent-dir /path/to/your-paper-repo
+```
+
+直接从 GitHub 安装：
+
+```bash
+npx github:Excelius-Wang/marginalia
+```
+
+手动安装：
+
 ```bash
 mkdir -p ~/.codex/skills
 cp -R skills/marginalia ~/.codex/skills/
